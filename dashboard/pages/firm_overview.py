@@ -1,7 +1,10 @@
-from dash import html
+from dash import html, dcc
 import dash
 
 from dashboard.services.api import get_firm_summary
+from dashboard.services.brand import get_dataviz_palette
+from dashboard.plots.mock_charts import dimension_bar_chart
+from dashboard.data.mock_data import MOCK_DIMENSIONS, MOCK_DIMENSION_SCORES
 
 
 dash.register_page(__name__, path="/")
@@ -9,6 +12,9 @@ dash.register_page(__name__, path="/")
 
 def layout():
     summary = get_firm_summary("firm_1")
+    palette = get_dataviz_palette()
+    fig = dimension_bar_chart(MOCK_DIMENSIONS, MOCK_DIMENSION_SCORES, palette)
+
     return html.Div(
         children=[
             html.H2("Firm Overview"),
@@ -22,8 +28,11 @@ def layout():
                 ],
             ),
             html.Div(
-                style={"marginTop": "24px"},
-                children="Placeholder for firm-level charts and insights.",
+                className="section",
+                children=[
+                    html.Div("Relationship Dimensions (Mock)", className="chart-title"),
+                    dcc.Graph(figure=fig, className="chart-card"),
+                ],
             ),
         ]
     )

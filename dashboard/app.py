@@ -2,13 +2,13 @@ from dash import Dash, html, dcc
 import dash
 
 from dashboard.services.api import get_firms
-from dashboard.themes.brand import BRAND_CSS
 
 app = Dash(
     __name__,
     use_pages=True,
     suppress_callback_exceptions=True,
 )
+app.title = "Wealthtender Dashboard"
 
 app.layout = html.Div(
     className="app-shell",
@@ -17,7 +17,21 @@ app.layout = html.Div(
         html.Div(
             className="top-nav",
             children=[
-                html.Div("Wealthtender Dashboard", className="brand-title"),
+                html.Div(
+                    className="brand-block",
+                    children=[
+                        html.Img(
+                            src=app.get_asset_url("brand/logo-mark.svg"),
+                            className="brand-mark",
+                            alt="Wealthtender mark",
+                        ),
+                        html.Img(
+                            src=app.get_asset_url("brand/logo-wordmark.svg"),
+                            className="brand-wordmark",
+                            alt="Wealthtender",
+                        ),
+                    ],
+                ),
                 html.Div(
                     className="top-nav-links",
                     children=[
@@ -51,8 +65,6 @@ app.layout = html.Div(
         ),
     ],
 )
-
-app.index_string = BRAND_CSS
 
 if __name__ == "__main__":
     app.run_server(debug=True, port=8050)
