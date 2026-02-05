@@ -1,0 +1,8 @@
+[
+  {"run_id":"run_2026_02_05","firm_id":"firm_1","advisor_id":"adv_1","dimension":"Classic Rock","score":78.2,"confidence":0.74,"review_count":48,"period":"2025-Q4"},
+  {"run_id":"run_2026_02_05","firm_id":"firm_1","advisor_id":"adv_1","dimension":"Punk Rock","score":62.5,"confidence":0.61,"review_count":48,"period":"2025-Q4"},
+  {"run_id":"run_2026_02_05","firm_id":"firm_1","advisor_id":"adv_1","dimension":"Emo","score":85.1,"confidence":0.80,"review_count":48,"period":"2025-Q4"},
+  {"run_id":"run_2026_02_05","firm_id":"firm_1","advisor_id":"adv_2","dimension":"Classic Rock","score":71.4,"confidence":0.68,"review_count":31,"period":"2025-Q4"},
+  {"run_id":"run_2026_02_05","firm_id":"firm_1","advisor_id":"adv_2","dimension":"Synthwave","score":88.3,"confidence":0.72,"review_count":31,"period":"2025-Q4"},
+  {"run_id":"run_2026_02_05","firm_id":"firm_2","advisor_id":"adv_3","dimension":"Jazz Fusion","score":66.9,"confidence":0.59,"review_count":22,"period":"2025-Q4"}
+]
