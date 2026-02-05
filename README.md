@@ -38,8 +38,8 @@ Note: the first run installs dependencies and can take a minute. Subsequent runs
 
 ## Notes on Python Version
 
-This repo supports Python 3.11–3.13. The launcher will use 3.12 or 3.11 if available,
-but 3.13 should work out of the box with the current dependency pins.
+This repo supports Python 3.9–3.13. The launcher prefers 3.12 or 3.11 if available,
+but will use your default `python3` if not.
 
 ## Structure
 

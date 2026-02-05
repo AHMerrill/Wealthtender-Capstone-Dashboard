@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Optional, List, Dict
 
 import pandas as pd
 
@@ -8,7 +9,7 @@ DEFAULT_METADATA = ROOT / "artifacts" / "sample" / "metadata.json"
 
 
 class ArtifactStore:
-    def __init__(self, metadata_path: Path | None = None) -> None:
+    def __init__(self, metadata_path: Optional[Path] = None) -> None:
         self.metadata_path = metadata_path or DEFAULT_METADATA
         self.metadata = self._load_metadata()
         self.scores = self._load_table("scores")
@@ -38,7 +39,7 @@ class ArtifactStore:
         firms = self.scores[["firm_id"]].drop_duplicates().sort_values("firm_id")
         return [{"firm_id": fid} for fid in firms["firm_id"].tolist()]
 
-    def firm_summary(self, firm_id: str) -> dict | None:
+    def firm_summary(self, firm_id: str) -> Optional[Dict]:
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
@@ -51,7 +52,7 @@ class ArtifactStore:
         }
         return summary
 
-    def firm_advisors(self, firm_id: str) -> list[dict] | None:
+    def firm_advisors(self, firm_id: str) -> Optional[List[Dict]]:
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
@@ -62,7 +63,7 @@ class ArtifactStore:
         )
         return summary.to_dict(orient="records")
 
-    def advisor_detail(self, firm_id: str, advisor_id: str) -> dict | None:
+    def advisor_detail(self, firm_id: str, advisor_id: str) -> Optional[Dict]:
         df = self.scores[(self.scores["firm_id"] == firm_id) & (self.scores["advisor_id"] == advisor_id)]
         if df.empty:
             return None
@@ -74,13 +75,13 @@ class ArtifactStore:
             "themes": themes,
         }
 
-    def firm_benchmarks(self, firm_id: str) -> list[dict] | None:
+    def firm_benchmarks(self, firm_id: str) -> Optional[List[Dict]]:
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
         return self.benchmarks.to_dict(orient="records")
 
-    def firm_personas(self, firm_id: str) -> list[dict] | None:
+    def firm_personas(self, firm_id: str) -> Optional[List[Dict]]:
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
