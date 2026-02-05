@@ -11,15 +11,9 @@ Launch Dashboard (local demo):
 ## Quickstart (local)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Terminal 1
-uvicorn api.main:app --reload --port 8000
-
-# Terminal 2
-python dashboard/app.py
+git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git
+cd Wealthtender-Capstone-Dashboard
+./run.sh
 ```
 
 Then open:
@@ -27,6 +21,12 @@ Then open:
 ```
 http://localhost:8050
 ```
+
+## Notes on Python Version
+
+`pydantic-core` currently has limited wheels for Python 3.13. The `run.sh` launcher prefers
+Python 3.12 or 3.11 if available to avoid build errors. If you only have Python 3.13,
+install Python 3.12 and re-run `./run.sh`.
 
 ## Structure
 
