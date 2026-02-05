@@ -1,12 +1,16 @@
 from dash import Dash, html, dcc
 import dash
+from pathlib import Path
 
 from dashboard.services.api import get_firms
+
+ROOT = Path(__file__).resolve().parents[1]
 
 app = Dash(
     __name__,
     use_pages=True,
     suppress_callback_exceptions=True,
+    assets_folder=str(ROOT / "assets"),
 )
 app.title = "Wealthtender Dashboard"
 

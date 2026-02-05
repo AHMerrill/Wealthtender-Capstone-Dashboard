@@ -1,5 +1,9 @@
 $ErrorActionPreference = "Stop"
 
+# Always run from the repo root (where this script lives).
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $ScriptDir
+
 function Find-Python {
   if (Get-Command python3.12 -ErrorAction SilentlyContinue) { return "python3.12" }
   if (Get-Command python3.11 -ErrorAction SilentlyContinue) { return "python3.11" }
