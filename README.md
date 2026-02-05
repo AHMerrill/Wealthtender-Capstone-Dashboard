@@ -30,9 +30,8 @@ http://localhost:8050
 
 ## Notes on Python Version
 
-`pydantic-core` currently has limited wheels for Python 3.13. The launcher prefers
-Python 3.12 or 3.11 if available to avoid build errors. If you only have Python 3.13,
-install Python 3.12 and re-run the launcher.
+This repo supports Python 3.11–3.13. The launcher will use 3.12 or 3.11 if available,
+but 3.13 should work out of the box with the current dependency pins.
 
 ## Structure
 
