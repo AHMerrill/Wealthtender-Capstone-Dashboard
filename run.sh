@@ -10,15 +10,20 @@ else
   PY=python3
 fi
 
-$PY -m venv .venv
+if [ ! -d .venv ]; then
+  $PY -m venv .venv
+fi
+
 source .venv/bin/activate
+
+# Install once; re-running is fast if already installed.
 pip install -r requirements.txt
 
 # Start API in background, then start dashboard.
-uvicorn api.main:app --reload --port 8000 &
+uvicorn api.main:app --port 8000 &
 API_PID=$!
 
-python dashboard/app.py
+python -m dashboard.app
 
 # Clean up API on exit
 kill $API_PID

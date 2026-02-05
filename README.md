@@ -28,6 +28,14 @@ Then open:
 http://localhost:8050
 ```
 
+If you already cloned the repo, just run:
+
+```bash
+./run.sh
+```
+
+Note: the first run installs dependencies and can take a minute. Subsequent runs are fast.
+
 ## Notes on Python Version
 
 This repo supports Python 3.11–3.13. The launcher will use 3.12 or 3.11 if available,

@@ -8,10 +8,10 @@ function Find-Python {
 }
 
 $PY = Find-Python
-& $PY -m venv .venv
+if (-Not (Test-Path .\\.venv)) { & $PY -m venv .venv }
 . .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 # Start API in background, then start dashboard.
-Start-Process -NoNewWindow -FilePath uvicorn -ArgumentList "api.main:app --reload --port 8000"
-python dashboard\app.py
+Start-Process -NoNewWindow -FilePath uvicorn -ArgumentList "api.main:app --port 8000"
+python -m dashboard.app
