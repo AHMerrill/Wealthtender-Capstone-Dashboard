@@ -8,22 +8,24 @@ Launch Dashboard (local demo):
 
 [![Launch Dashboard](https://img.shields.io/badge/launch-dashboard-blue)](http://localhost:8050)
 
-## Run (local)
-
-### 1) Start API
+## Quickstart (local)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Terminal 1
 uvicorn api.main:app --reload --port 8000
+
+# Terminal 2
+python dashboard/app.py
 ```
 
-### 2) Start Dashboard
+Then open:
 
-```bash
-source .venv/bin/activate
-python dashboard/app.py
+```
+http://localhost:8050
 ```
 
 ## Structure
