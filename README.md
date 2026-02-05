@@ -45,3 +45,19 @@ but 3.13 should work out of the box with the current dependency pins.
 
 - Auth is stubbed. The dashboard currently uses a firm selector to simulate firm scoping.
 - Artifacts are loaded via the API. The dashboard does not read files directly.
+
+## Deployment + Auth Handoff
+
+This repo is designed for a standard production setup:
+
+1. Deploy the API and Dash app on a server or container.
+2. Put authentication in front of the app (reverse proxy or API-layer auth).
+3. Expose a URL like `dashboard.clientsite.com`, or embed via iframe.
+
+Common auth options:
+- Username/password via reverse proxy (e.g., Nginx + basic auth or OAuth/SSO).
+- Firm-scoped JWTs enforced by the API.
+- SSO integration handled at the hosting layer.
+
+The dashboard already assumes firm scoping. In production, the selected firm should
+come from the authenticated user context rather than a dropdown.
