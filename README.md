@@ -34,6 +34,8 @@ If you already cloned the repo, just run:
 ./run.sh
 ```
 
+Do not run `git clone` from inside an existing clone (it creates nested folders).
+
 Note: the first run installs dependencies and can take a minute. Subsequent runs are fast.
 
 ## Notes on Python Version
