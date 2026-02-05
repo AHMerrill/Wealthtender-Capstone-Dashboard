@@ -10,10 +10,16 @@ Launch Dashboard (local demo):
 
 ## Quickstart (local)
 
+### macOS / Linux (one command)
+
 ```bash
-git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git
-cd Wealthtender-Capstone-Dashboard
-./run.sh
+git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git && cd Wealthtender-Capstone-Dashboard && ./run.sh
+```
+
+### Windows PowerShell (one command)
+
+```powershell
+git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git; cd Wealthtender-Capstone-Dashboard; .\run.ps1
 ```
 
 Then open:
@@ -24,9 +30,9 @@ http://localhost:8050
 
 ## Notes on Python Version
 
-`pydantic-core` currently has limited wheels for Python 3.13. The `run.sh` launcher prefers
+`pydantic-core` currently has limited wheels for Python 3.13. The launcher prefers
 Python 3.12 or 3.11 if available to avoid build errors. If you only have Python 3.13,
-install Python 3.12 and re-run `./run.sh`.
+install Python 3.12 and re-run the launcher.
 
 ## Structure
 
