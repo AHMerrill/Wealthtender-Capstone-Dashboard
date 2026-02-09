@@ -14,6 +14,9 @@ app = Dash(
     suppress_callback_exceptions=True,
     assets_folder=str(ROOT / "assets"),
 )
+
+server = app.server
+
 app.title = "Wealthtender Dashboard"
 ensure_theme_css()
 app.index_string = """
