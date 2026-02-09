@@ -144,26 +144,14 @@ def update_macro_insights(
     payload = get_macro_insights(params)
     if not payload:
         empty_fig = go.Figure()
+        empty_figs = [empty_fig] * 6
+        no_updates = [no_update] * 10
         return (
             [],
             [],
             [],
-            empty_fig,
-            empty_fig,
-            empty_fig,
-            empty_fig,
-            empty_fig,
-            empty_fig,
-            empty_fig,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
-            no_update,
+            *empty_figs,
+            *no_updates,
         )
 
     summary = payload.get("summary", {})
