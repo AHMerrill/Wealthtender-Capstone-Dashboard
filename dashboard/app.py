@@ -1,8 +1,10 @@
-from dash import Dash, html, dcc
+from dash import Dash, html, dcc, callback, Input, Output, State, no_update
 import dash
 from pathlib import Path
 
 from dashboard.services.api import get_firms
+from dashboard.components.macro_insights_content import macro_content
+from dashboard.branding import ensure_theme_css
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,15 +15,37 @@ app = Dash(
     assets_folder=str(ROOT / "assets"),
 )
 app.title = "Wealthtender Dashboard"
+ensure_theme_css()
+app.index_string = """
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" type="image/png" href="/assets/favicon.png">
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+"""
 
 app.layout = html.Div(
     className="app-shell",
     children=[
+        dcc.Location(id="url"),
         dcc.Store(id="selected-firm", storage_type="session"),
         html.Div(
             className="top-nav",
             children=[
-                html.Div(
+                html.A(
+                    href="https://wealthtender.com",
                     className="brand-block",
                     children=[
                         html.Img(
@@ -39,7 +63,9 @@ app.layout = html.Div(
                 html.Div(
                     className="top-nav-links",
                     children=[
-                        dcc.Link("Firm Overview", href="/"),
+                        dcc.Link("Home", href="/"),
+                        dcc.Link("Macro Insights", href="/macro-insights"),
+                        dcc.Link("Firm Overview", href="/firm-overview"),
                         dcc.Link("Advisor Detail", href="/advisor"),
                         dcc.Link("Personas", href="/personas"),
                         dcc.Link("Benchmarks", href="/benchmarks"),
@@ -49,26 +75,151 @@ app.layout = html.Div(
             ],
         ),
         html.Div(
+            id="content-shell",
             className="content-shell",
             children=[
-                html.Aside(
-                    className="sidebar",
+                html.Aside(id="sidebar", className="sidebar"),
+                html.Main(
+                    className="page-container",
                     children=[
-                        html.Div("Firm Selector", className="sidebar-title"),
-                        dcc.Dropdown(
-                            id="firm-dropdown",
-                            options=[{"label": f["firm_id"], "value": f["firm_id"]} for f in get_firms()],
-                            placeholder="Select firm",
-                        ),
-                        html.Div("Filters", className="sidebar-title"),
-                        html.Div("(Add filters per view)", className="sidebar-note"),
+                        html.Div(id="macro-shell", children=macro_content()),
+                        html.Div(id="page-shell", children=[dash.page_container]),
                     ],
                 ),
-                html.Main(className="page-container", children=[dash.page_container]),
             ],
         ),
     ],
 )
 
+
+@callback(
+    Output("firm-dropdown", "options"),
+    Output("firm-dropdown", "value"),
+    Input("firm-dropdown", "value"),
+    State("firm-dropdown", "options"),
+)
+def load_firm_options(selected_value, current_options):
+    if current_options:
+        return no_update, no_update
+    firms = get_firms()
+    options = [{"label": f["firm_id"], "value": f["firm_id"]} for f in firms]
+    if not options:
+        options = [{"label": "No firms available", "value": "__none__", "disabled": True}]
+    default_value = selected_value or (options[0]["value"] if options else None)
+    return options, default_value
+
+
+@callback(
+    Output("sidebar", "children"),
+    Input("url", "pathname"),
+)
+def render_sidebar(pathname):
+    header = html.Div(
+        className="sidebar-header",
+        children=[html.Div("Filters", className="sidebar-title")],
+    )
+
+    firm_selector = html.Div(
+        className="filter-group",
+        style={"marginTop": "12px"},
+        children=[
+            html.Div("Firm Selector", className="filter-label"),
+            dcc.Dropdown(
+                id="firm-dropdown",
+                placeholder="Select firm",
+                searchable=False,
+            ),
+        ],
+    )
+    macro_filters = html.Div(
+        className="sidebar-section",
+        style={"display": "block" if pathname == "/macro-insights" else "none"},
+        children=[
+            html.Div(
+                className="filter-group",
+                children=[
+                    html.Div("Scope", className="filter-label"),
+                    dcc.RadioItems(
+                        id="macro-scope",
+                        options=[
+                            {"label": "Global", "value": "global"},
+                            {"label": "Firm", "value": "firm"},
+                        ],
+                        value="global",
+                        inline=False,
+                    ),
+                ],
+            ),
+            firm_selector,
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("Rating", className="filter-label"),
+                    dcc.Dropdown(
+                        id="macro-rating-filter",
+                        options=[{"label": "All", "value": "all"}]
+                        + [{"label": str(i), "value": float(i)} for i in range(1, 6)],
+                        value="all",
+                        clearable=False,
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("Date Range", className="filter-label"),
+                    dcc.DatePickerRange(
+                        id="macro-date-range",
+                        start_date=None,
+                        end_date=None,
+                        display_format="YYYY-MM-DD",
+                        start_date_placeholder_text="Start",
+                        end_date_placeholder_text="End",
+                        style={"width": "100%"},
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("Token Count", className="filter-label"),
+                    dcc.RangeSlider(
+                        id="macro-token-range",
+                        min=0,
+                        max=1000,
+                        step=10,
+                        value=[0, 1000],
+                        tooltip={"placement": "bottom", "always_visible": False},
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    default_filters = html.Div(
+        style={"display": "none" if pathname == "/macro-insights" else "block"},
+        children=[
+            firm_selector,
+            html.Div("(Page filters will appear here)", className="sidebar-note"),
+        ],
+    )
+
+    return [header, macro_filters, default_filters]
+
+
+@callback(
+    Output("macro-shell", "style"),
+    Output("page-shell", "style"),
+    Input("url", "pathname"),
+)
+def toggle_macro_shell(pathname):
+    if pathname == "/macro-insights":
+        return {"display": "block"}, {"display": "none"}
+    return {"display": "none"}, {"display": "block"}
+
+
 if __name__ == "__main__":
-    app.run_server(debug=True, port=8050)
+    app.run(debug=True, port=8050)

@@ -28,7 +28,7 @@ if command -v lsof >/dev/null 2>&1 && lsof -ti :8000 >/dev/null 2>&1; then
   echo "API already running on port 8000; skipping start."
   API_PID=""
 else
-  uvicorn api.main:app --port 8000 &
+  python -m uvicorn api.main:app --port 8000 &
   API_PID=$!
 fi
 

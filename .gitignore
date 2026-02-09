@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 
 wt_dash_secrets.txt
+eda/
+project_definition_guide/
+Brandbook/

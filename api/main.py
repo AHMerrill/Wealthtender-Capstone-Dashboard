@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from api.services.artifacts import ArtifactStore
 
@@ -22,6 +24,14 @@ def firm_summary(firm_id: str):
     if not summary:
         raise HTTPException(status_code=404, detail="firm not found")
     return summary
+
+
+@app.get("/api/firm/{firm_id}/dimensions")
+def firm_dimensions(firm_id: str):
+    dimensions = store.firm_dimensions(firm_id)
+    if dimensions is None:
+        raise HTTPException(status_code=404, detail="firm not found")
+    return dimensions
 
 @app.get("/api/firm/{firm_id}/advisors")
 def firm_advisors(firm_id: str):
@@ -50,3 +60,29 @@ def firm_personas(firm_id: str):
     if personas is None:
         raise HTTPException(status_code=404, detail="firm not found")
     return personas
+
+
+@app.get("/api/macro-insights/charts")
+def macro_insights_charts(
+    scope: str = "global",
+    firm_id: Optional[str] = None,
+    date_start: Optional[str] = None,
+    date_end: Optional[str] = None,
+    rating: Optional[float] = None,
+    min_tokens: Optional[int] = None,
+    max_tokens: Optional[int] = None,
+    preset: Optional[str] = None,
+):
+    payload = store.macro_insights_payload(
+        scope=scope,
+        firm_id=firm_id,
+        date_start=date_start,
+        date_end=date_end,
+        rating=rating,
+        min_tokens=min_tokens,
+        max_tokens=max_tokens,
+        preset=preset,
+    )
+    if not payload:
+        raise HTTPException(status_code=404, detail="macro insights not available")
+    return payload

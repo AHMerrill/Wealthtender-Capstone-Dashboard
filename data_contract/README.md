@@ -8,7 +8,7 @@ Required columns:
 - `run_id` (string)
 - `firm_id` (string)
 - `advisor_id` (string)
-- `dimension` (string)  # placeholder dimensions for now: Classic Rock, Punk Rock, Emo, Jazz Fusion, Indie Pop, Synthwave
+- `dimension` (string)
 - `score` (float, 0-100)
 - `confidence` (float, 0-1)
 - `review_count` (int)

@@ -17,5 +17,5 @@ if (-Not (Test-Path .\\.venv)) { & $PY -m venv .venv }
 pip install -r requirements.txt
 
 # Start API in background, then start dashboard.
-Start-Process -NoNewWindow -FilePath uvicorn -ArgumentList "api.main:app --port 8000"
+Start-Process -NoNewWindow -FilePath $PY -ArgumentList "-m","uvicorn","api.main:app","--port","8000"
 python -m dashboard.app

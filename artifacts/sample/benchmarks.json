@@ -1,5 +1,0 @@
-[
-  {"run_id":"run_2026_02_05","peer_group":"industry","dimension":"Classic Rock","p25":60.0,"p50":72.0,"p75":84.0},
-  {"run_id":"run_2026_02_05","peer_group":"industry","dimension":"Punk Rock","p25":55.0,"p50":66.0,"p75":78.0},
-  {"run_id":"run_2026_02_05","peer_group":"industry","dimension":"Emo","p25":62.0,"p50":74.0,"p75":86.0}
-]

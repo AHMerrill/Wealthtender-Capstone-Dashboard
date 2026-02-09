@@ -1,12 +1,13 @@
+from typing import Optional, Dict
+
 import requests
-from dashboard.data.mock_data import MOCK_FIRMS, MOCK_FIRM_SUMMARY
 
 API_BASE = "http://localhost:8000"
 
 
-def _get(path: str):
+def _get(path: str, params: Optional[Dict] = None):
     try:
-        resp = requests.get(f"{API_BASE}{path}", timeout=2)
+        resp = requests.get(f"{API_BASE}{path}", params=params, timeout=2)
         if resp.status_code == 200:
             return resp.json()
     except Exception:
@@ -16,9 +17,19 @@ def _get(path: str):
 
 def get_firms():
     data = _get("/api/firms")
-    return data if data else MOCK_FIRMS
+    return data if data else []
 
 
 def get_firm_summary(firm_id: str):
     data = _get(f"/api/firm/{firm_id}/summary")
-    return data if data else MOCK_FIRM_SUMMARY
+    return data if data else {}
+
+
+def get_firm_dimensions(firm_id: str):
+    data = _get(f"/api/firm/{firm_id}/dimensions")
+    return data if data else []
+
+
+def get_macro_insights(params: dict):
+    data = _get("/api/macro-insights/charts", params=params)
+    return data if data else {}

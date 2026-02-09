@@ -1,48 +1,14 @@
-from dash import html, dcc
+from dash import html
 import dash
 
-from dashboard.services.api import get_firm_summary
-from dashboard.services.brand import get_dataviz_palette
-from dashboard.plots.mock_charts import dimension_bar_chart
-from dashboard.data.mock_data import MOCK_DIMENSIONS, MOCK_DIMENSION_SCORES
 
-
-dash.register_page(__name__, path="/")
+dash.register_page(__name__, path="/firm-overview")
 
 
 def layout():
-    summary = get_firm_summary("firm_1")
-    palette = get_dataviz_palette()
-    fig = dimension_bar_chart(MOCK_DIMENSIONS, MOCK_DIMENSION_SCORES, palette)
-
     return html.Div(
         children=[
             html.H2("Firm Overview"),
-            html.Div(
-                className="kpi-grid",
-                children=[
-                    _kpi("Advisor Count", summary.get("advisor_count")),
-                    _kpi("Dimensions", summary.get("dimension_count")),
-                    _kpi("Avg Score", summary.get("avg_score")),
-                    _kpi("Avg Confidence", summary.get("avg_confidence")),
-                ],
-            ),
-            html.Div(
-                className="section",
-                children=[
-                    html.Div("Relationship Dimensions (Mock)", className="chart-title"),
-                    dcc.Graph(figure=fig, className="chart-card"),
-                ],
-            ),
+            html.Div("Placeholder for firm overview KPIs and charts."),
         ]
-    )
-
-
-def _kpi(label, value):
-    return html.Div(
-        className="kpi-card",
-        children=[
-            html.Div(label, className="kpi-label"),
-            html.Div(value, className="kpi-value"),
-        ],
     )

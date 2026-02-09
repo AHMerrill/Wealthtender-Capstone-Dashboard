@@ -1,0 +1,15 @@
+{
+  "run_id": "run_2026_02_05",
+  "created_at": "2026-02-05T12:00:00Z",
+  "schema_version": "v0",
+  "artifact_manifest": [
+    {"name": "macro_reviews_clean", "type": "csv", "path": "artifacts/macro_insights/reviews_clean.csv"},
+    {"name": "macro_eda_summary", "type": "json", "path": "artifacts/macro_insights/eda/eda_summary.json"},
+    {"name": "macro_coverage", "type": "json", "path": "artifacts/macro_insights/eda/coverage.json"},
+    {"name": "macro_quality_summary", "type": "json", "path": "artifacts/macro_insights/quality/quality_summary.json"},
+    {"name": "macro_raw_file_meta", "type": "json", "path": "artifacts/macro_insights/quality/raw_file_meta.json"},
+    {"name": "macro_missing_report", "type": "csv", "path": "artifacts/macro_insights/quality/missing_report.csv"},
+    {"name": "macro_top_tokens", "type": "csv", "path": "artifacts/macro_insights/lexical/top_tokens.csv"},
+    {"name": "macro_top_bigrams", "type": "csv", "path": "artifacts/macro_insights/lexical/top_bigrams.csv"}
+  ]
+}
