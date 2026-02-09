@@ -232,6 +232,42 @@ class ArtifactStore:
             "themes": themes.to_dict(orient="records"),
         }
 
+    def review_detail(self, review_id: str) -> Optional[Dict[str, Any]]:
+        df = self.macro_reviews_clean
+        if df.empty or "ID" not in df.columns:
+            return None
+        match = df[df["ID"].astype(str) == str(review_id)]
+        if match.empty:
+            return None
+        row = match.iloc[0]
+        review_date = row.get("review_date")
+        if pd.isna(review_date):
+            review_date = None
+        elif hasattr(review_date, "isoformat"):
+            review_date = review_date.isoformat()
+        rating = row.get("rating")
+        if pd.isna(rating):
+            rating = None
+        token_count = row.get("token_count")
+        if pd.isna(token_count):
+            token_count = None
+        else:
+            try:
+                token_count = int(token_count)
+            except (TypeError, ValueError):
+                token_count = None
+        return {
+            "review_id": str(row.get("ID")),
+            "title": row.get("Title"),
+            "content": row.get("Content"),
+            "review_date": review_date,
+            "rating": float(rating) if rating is not None else None,
+            "token_count": token_count,
+            "advisor_name": row.get("advisor_name"),
+            "reviewer_name": row.get("reviewer_name"),
+            "review_url": row.get("notification_page"),
+        }
+
     def firm_benchmarks(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms or self.benchmarks.empty:
             return None
@@ -456,7 +492,12 @@ class ArtifactStore:
         if df.empty or "rating" not in df.columns or "token_count" not in df.columns:
             return []
         subset = df.dropna(subset=["rating", "token_count"])
-        return subset[["rating", "token_count"]].to_dict(orient="records")
+        records = subset[["rating", "token_count"]].to_dict(orient="records")
+        if "ID" in df.columns:
+            ids = subset["ID"].astype(str).tolist()
+            for record, review_id in zip(records, ids):
+                record["review_id"] = review_id
+        return records
 
     def _macro_lexical(self, df: pd.DataFrame, top_n: int,
                        preset: Optional[str], lexical_n: int,
