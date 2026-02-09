@@ -67,7 +67,7 @@ app.layout = html.Div(
                     className="top-nav-links",
                     children=[
                         dcc.Link("Home", href="/"),
-                        dcc.Link("EDA", href="/macro-insights"),
+                        dcc.Link("EDA", href="/eda"),
                         dcc.Link("Firm Overview", href="/firm-overview"),
                         dcc.Link("Advisor Detail", href="/advisor"),
                         dcc.Link("Personas", href="/personas"),
@@ -136,7 +136,7 @@ def render_sidebar(pathname):
     )
     macro_filters = html.Div(
         className="sidebar-section",
-        style={"display": "block" if pathname == "/macro-insights" else "none"},
+        style={"display": "block" if pathname == "/eda" else "none"},
         children=[
             html.Div(
                 className="filter-group",
@@ -262,7 +262,7 @@ def render_sidebar(pathname):
     )
 
     default_filters = html.Div(
-        style={"display": "none" if pathname == "/macro-insights" else "block"},
+        style={"display": "none" if pathname == "/eda" else "block"},
         children=[
             firm_selector,
             html.Div("(Page filters will appear here)", className="sidebar-note"),
@@ -278,7 +278,7 @@ def render_sidebar(pathname):
     Input("url", "pathname"),
 )
 def toggle_macro_shell(pathname):
-    if pathname == "/macro-insights":
+    if pathname == "/eda":
         return {"display": "block"}, {"display": "none"}
     return {"display": "none"}, {"display": "block"}
 
