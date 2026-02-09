@@ -1,4 +1,5 @@
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -7,6 +8,20 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_METADATA = ROOT / "artifacts" / "metadata.json"
+
+STOPWORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
+    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but",
+    "by", "can", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for",
+    "from", "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself",
+    "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "just",
+    "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on", "once",
+    "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she",
+    "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves",
+    "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until",
+    "up", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom",
+    "why", "with", "you", "your", "yours", "yourself", "yourselves",
+}
 
 
 class ArtifactStore:
@@ -149,14 +164,29 @@ class ArtifactStore:
         rating: Optional[float] = None,
         min_tokens: Optional[int] = None,
         max_tokens: Optional[int] = None,
+        min_reviews_per_advisor: Optional[int] = None,
+        max_reviews_per_advisor: Optional[int] = None,
         preset: Optional[str] = None,
+        lexical_n: int = 1,
         lexical_top_n: int = 20,
+        exclude_stopwords: bool = False,
     ) -> Dict[str, Any]:
         if self.macro_reviews_clean.empty:
             return {}
         if preset == "eda":
             df = self.macro_reviews_clean.copy()
             return self._macro_payload_from_df(df, lexical_top_n, preset="eda")
+        base_df = self._apply_macro_filters(
+            scope=scope,
+            firm_id=firm_id,
+            date_start=date_start,
+            date_end=date_end,
+            rating=rating,
+            min_tokens=None,
+            max_tokens=None,
+            min_reviews_per_advisor=None,
+            max_reviews_per_advisor=None,
+        )
         df = self._apply_macro_filters(
             scope=scope,
             firm_id=firm_id,
@@ -165,8 +195,17 @@ class ArtifactStore:
             rating=rating,
             min_tokens=min_tokens,
             max_tokens=max_tokens,
+            min_reviews_per_advisor=min_reviews_per_advisor,
+            max_reviews_per_advisor=max_reviews_per_advisor,
         )
-        return self._macro_payload_from_df(df, lexical_top_n)
+        payload = self._macro_payload_from_df(
+            df,
+            lexical_top_n,
+            lexical_n=lexical_n,
+            exclude_stopwords=exclude_stopwords,
+        )
+        payload["meta"] = self._macro_meta(base_df)
+        return payload
 
     def _apply_macro_filters(
         self,
@@ -177,6 +216,8 @@ class ArtifactStore:
         rating: Optional[float],
         min_tokens: Optional[int],
         max_tokens: Optional[int],
+        min_reviews_per_advisor: Optional[int],
+        max_reviews_per_advisor: Optional[int],
     ) -> pd.DataFrame:
         df = self.macro_reviews_clean.copy()
         if scope == "firm" and firm_id and "firm_id" in df.columns:
@@ -191,9 +232,22 @@ class ArtifactStore:
             df = df[df["token_count"] >= min_tokens]
         if max_tokens is not None and "token_count" in df.columns:
             df = df[df["token_count"] <= max_tokens]
+        if (min_reviews_per_advisor is not None or max_reviews_per_advisor is not None) and "advisor_id" in df.columns:
+            counts = df.groupby("advisor_id").size()
+            min_reviews = min_reviews_per_advisor if min_reviews_per_advisor is not None else counts.min()
+            max_reviews = max_reviews_per_advisor if max_reviews_per_advisor is not None else counts.max()
+            eligible_advisors = counts[(counts >= min_reviews) & (counts <= max_reviews)].index
+            df = df[df["advisor_id"].isin(eligible_advisors)]
         return df
 
-    def _macro_payload_from_df(self, df: pd.DataFrame, lexical_top_n: int, preset: Optional[str] = None) -> Dict[str, Any]:
+    def _macro_payload_from_df(
+        self,
+        df: pd.DataFrame,
+        lexical_top_n: int,
+        preset: Optional[str] = None,
+        lexical_n: int = 1,
+        exclude_stopwords: bool = False,
+    ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {}
         payload["summary"] = self._macro_summary(df, preset=preset)
         payload["quality"] = self._macro_quality(df, preset=preset)
@@ -203,7 +257,13 @@ class ArtifactStore:
         payload["reviews_per_advisor"] = self._macro_reviews_per_advisor(df)
         payload["token_counts"] = self._macro_token_counts(df)
         payload["rating_vs_token"] = self._macro_rating_vs_token(df)
-        payload["lexical"] = self._macro_lexical(df, top_n=lexical_top_n, preset=preset)
+        payload["lexical"] = self._macro_lexical(
+            df,
+            top_n=lexical_top_n,
+            preset=preset,
+            lexical_n=lexical_n,
+            exclude_stopwords=exclude_stopwords,
+        )
         payload["meta"] = self._macro_meta(df)
         return payload
 
@@ -216,6 +276,13 @@ class ArtifactStore:
         token_max = df["token_count"].max() if "token_count" in df.columns else None
         rating_min = df["rating"].min() if "rating" in df.columns else None
         rating_max = df["rating"].max() if "rating" in df.columns else None
+        if "advisor_id" in df.columns:
+            review_counts = df.groupby("advisor_id").size()
+            reviews_per_advisor_min = int(review_counts.min())
+            reviews_per_advisor_max = int(review_counts.max())
+        else:
+            reviews_per_advisor_min = None
+            reviews_per_advisor_max = None
         return {
             "date_min": date_min.isoformat() if pd.notna(date_min) else None,
             "date_max": date_max.isoformat() if pd.notna(date_max) else None,
@@ -224,6 +291,8 @@ class ArtifactStore:
             "token_max": int(token_max) if pd.notna(token_max) else None,
             "rating_min": float(rating_min) if pd.notna(rating_min) else None,
             "rating_max": float(rating_max) if pd.notna(rating_max) else None,
+            "reviews_per_advisor_min": reviews_per_advisor_min,
+            "reviews_per_advisor_max": reviews_per_advisor_max,
         }
 
     def _macro_summary(self, df: pd.DataFrame, preset: Optional[str] = None) -> Dict[str, Any]:
@@ -329,32 +398,85 @@ class ArtifactStore:
             return []
         subset = df.dropna(subset=["token_count", "rating"])
         return [
-            {"rating": float(row["rating"]), "token_count": int(row["token_count"])}
+            {
+                "rating": float(row["rating"]),
+                "token_count": int(row["token_count"]),
+                "review_id": str(row["ID"]) if "ID" in df.columns else None,
+            }
             for _, row in subset.iterrows()
         ]
 
-    def _macro_lexical(self, df: pd.DataFrame, top_n: int, preset: Optional[str] = None) -> Dict[str, Any]:
+    def _macro_lexical(
+        self,
+        df: pd.DataFrame,
+        top_n: int,
+        preset: Optional[str] = None,
+        lexical_n: int = 1,
+        exclude_stopwords: bool = False,
+    ) -> Dict[str, Any]:
         if preset == "eda":
-            return {
-                "top_tokens": self._table_to_records(self.macro_top_tokens),
-                "top_bigrams": self._table_to_records(self.macro_top_bigrams),
-            }
+            tokens = self._table_to_records(self.macro_top_tokens)
+            top_ngrams = [{"ngram": t.get("token"), "count": t.get("count")} for t in tokens]
+            return {"top_ngrams": top_ngrams}
         if df.empty or "review_text_clean" not in df.columns:
-            return {"top_tokens": [], "top_bigrams": []}
-        tokens = Counter()
-        bigrams = Counter()
+            return {"top_ngrams": []}
+        n_value = int(lexical_n or 1)
+        n_value = max(1, min(n_value, 3))
+        counter = Counter()
         for text in df["review_text_clean"].dropna().astype(str):
-            parts = [p for p in text.split() if p]
-            tokens.update(parts)
-            bigrams.update([" ".join(pair) for pair in zip(parts, parts[1:])])
-        top_tokens = [{"token": k, "count": int(v)} for k, v in tokens.most_common(top_n)]
-        top_bigrams = [{"bigram": k, "count": int(v)} for k, v in bigrams.most_common(top_n)]
-        return {"top_tokens": top_tokens, "top_bigrams": top_bigrams}
+            parts = re.findall(r"[a-z0-9']+", text.lower())
+            if exclude_stopwords:
+                parts = [p for p in parts if p not in STOPWORDS]
+            if n_value == 1:
+                counter.update(parts)
+                continue
+            if len(parts) < n_value:
+                continue
+            ngrams = [" ".join(parts[i : i + n_value]) for i in range(len(parts) - n_value + 1)]
+            counter.update(ngrams)
+        top_ngrams = [{"ngram": k, "count": int(v)} for k, v in counter.most_common(top_n)]
+        return {"top_ngrams": top_ngrams}
 
     def _table_to_records(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
         if df.empty:
             return []
         return df.to_dict(orient="records")
+
+    def review_detail(self, review_id: str) -> Optional[Dict[str, Any]]:
+        df = self.macro_reviews_clean
+        if df.empty or "ID" not in df.columns:
+            return None
+        match = df[df["ID"].astype(str) == str(review_id)]
+        if match.empty:
+            return None
+        row = match.iloc[0]
+        review_date = row.get("review_date")
+        if pd.isna(review_date):
+            review_date = None
+        elif hasattr(review_date, "isoformat"):
+            review_date = review_date.isoformat()
+        rating = row.get("rating")
+        if pd.isna(rating):
+            rating = None
+        token_count = row.get("token_count")
+        if pd.isna(token_count):
+            token_count = None
+        else:
+            try:
+                token_count = int(token_count)
+            except (TypeError, ValueError):
+                token_count = None
+        return {
+            "review_id": str(row.get("ID")),
+            "title": row.get("Title"),
+            "content": row.get("Content"),
+            "review_date": review_date,
+            "rating": float(rating) if rating is not None else None,
+            "token_count": token_count,
+            "advisor_name": row.get("advisor_name"),
+            "reviewer_name": row.get("reviewer_name"),
+            "review_url": row.get("notification_page"),
+        }
 
 
 def _score_to_persona(score: float) -> str:

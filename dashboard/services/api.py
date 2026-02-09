@@ -33,3 +33,8 @@ def get_firm_dimensions(firm_id: str):
 def get_macro_insights(params: dict):
     data = _get("/api/macro-insights/charts", params=params)
     return data if data else {}
+
+
+def get_review_detail(review_id: str):
+    data = _get(f"/api/reviews/{review_id}")
+    return data if data else {}

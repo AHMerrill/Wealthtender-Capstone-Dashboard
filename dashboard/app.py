@@ -169,6 +169,21 @@ def render_sidebar(pathname):
                 className="filter-group",
                 style={"marginTop": "12px"},
                 children=[
+                    html.Div("Reviews per Advisor", className="filter-label"),
+                    dcc.RangeSlider(
+                        id="macro-review-range",
+                        min=0,
+                        max=50,
+                        step=1,
+                        value=[0, 50],
+                        tooltip={"placement": "bottom", "always_visible": False},
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
                     html.Div("Date Range", className="filter-label"),
                     dcc.DatePickerRange(
                         id="macro-date-range",
@@ -193,6 +208,50 @@ def render_sidebar(pathname):
                         step=10,
                         value=[0, 1000],
                         tooltip={"placement": "bottom", "always_visible": False},
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("N-gram Size", className="filter-label"),
+                    dcc.Dropdown(
+                        id="macro-ngram-size",
+                        options=[
+                            {"label": "1-gram", "value": 1},
+                            {"label": "2-gram", "value": 2},
+                            {"label": "3-gram", "value": 3},
+                        ],
+                        value=1,
+                        clearable=False,
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("Top N", className="filter-label"),
+                    dcc.Slider(
+                        id="macro-ngram-topn",
+                        min=10,
+                        max=50,
+                        step=5,
+                        value=20,
+                        marks={10: "10", 20: "20", 30: "30", 40: "40", 50: "50"},
+                    ),
+                ],
+            ),
+            html.Div(
+                className="filter-group",
+                style={"marginTop": "12px"},
+                children=[
+                    html.Div("Exclude Stopwords", className="filter-label"),
+                    dcc.Checklist(
+                        id="macro-exclude-stopwords",
+                        options=[{"label": "Exclude common words", "value": "exclude"}],
+                        value=["exclude"],
                     ),
                 ],
             ),

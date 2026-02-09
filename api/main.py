@@ -71,6 +71,11 @@ def macro_insights_charts(
     rating: Optional[float] = None,
     min_tokens: Optional[int] = None,
     max_tokens: Optional[int] = None,
+    min_reviews_per_advisor: Optional[int] = None,
+    max_reviews_per_advisor: Optional[int] = None,
+    lexical_n: Optional[int] = 1,
+    lexical_top_n: Optional[int] = 20,
+    exclude_stopwords: Optional[bool] = False,
     preset: Optional[str] = None,
 ):
     payload = store.macro_insights_payload(
@@ -81,8 +86,21 @@ def macro_insights_charts(
         rating=rating,
         min_tokens=min_tokens,
         max_tokens=max_tokens,
+        min_reviews_per_advisor=min_reviews_per_advisor,
+        max_reviews_per_advisor=max_reviews_per_advisor,
+        lexical_n=lexical_n,
+        lexical_top_n=lexical_top_n,
+        exclude_stopwords=exclude_stopwords,
         preset=preset,
     )
     if not payload:
         raise HTTPException(status_code=404, detail="macro insights not available")
     return payload
+
+
+@app.get("/api/reviews/{review_id}")
+def review_detail(review_id: str):
+    detail = store.review_detail(review_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="review not found")
+    return detail

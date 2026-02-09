@@ -77,8 +77,8 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: 20px;
+  padding: 18px 28px;
   background: white;
   border-bottom: 1px solid #e5e7eb;
 }}
@@ -100,9 +100,18 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 }}
 
 .top-nav-links a {{
-  margin-left: 16px;
+  margin: 0;
   color: var(--wt-ink);
   font-weight: 600;
+}}
+
+.top-nav-links {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
 }}
 
 .content-shell {{
@@ -120,7 +129,7 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   padding: 16px;
   height: fit-content;
   transition: all 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
 }}
 
 .sidebar-header {{
@@ -209,6 +218,10 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   max-width: 100%;
 }}
 
+.DateRangePicker_picker {{
+  z-index: 20;
+}}
+
 .sidebar-title {{
   font-weight: 700;
   font-size: 16px;
@@ -286,6 +299,47 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 .sidebar-section .DateRangePicker,
 .sidebar-section .rc-slider {{
   margin-bottom: 12px;
+}}
+
+.rc-slider-mark-text {{
+  font-size: 11px;
+  color: var(--wt-gray);
+}}
+
+.review-detail-card {{
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}}
+
+.review-detail-title {{
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--wt-ink);
+}}
+
+.review-detail-meta {{
+  font-size: 12px;
+  color: var(--wt-gray);
+  margin-bottom: 8px;
+}}
+
+.review-detail-text {{
+  font-size: 14px;
+  color: var(--wt-ink);
+  margin-bottom: 8px;
+}}
+
+.review-detail-link {{
+  font-size: 12px;
+  font-weight: 600;
+}}
+
+.review-detail-empty {{
+  font-size: 13px;
+  color: var(--wt-gray);
 }}
 
 

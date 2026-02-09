@@ -54,6 +54,7 @@ def token_count_hist(counts: list[int], palette: list[str]) -> go.Figure:
 def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure:
     x = [d["token_count"] for d in points]
     y = [d["rating"] for d in points]
+    custom = [d.get("review_id") for d in points]
     # Force a visible brand color (avoid white/light palette slots).
     marker_color = palette[1] if len(palette) > 1 else palette[0]
     fig = go.Figure(
@@ -62,6 +63,8 @@ def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure
                 x=x,
                 y=y,
                 mode="markers",
+                customdata=custom,
+                hovertemplate="Tokens: %{x}<br>Rating: %{y}<extra></extra>",
                 marker=dict(color=marker_color, size=7, opacity=0.7, line=dict(width=0.5, color="#111827")),
             )
         ]
