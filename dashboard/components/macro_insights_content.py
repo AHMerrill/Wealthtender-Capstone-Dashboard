@@ -154,7 +154,6 @@ def update_macro_insights(
             empty_fig,
             empty_fig,
             empty_fig,
-            empty_fig,
             no_update,
             no_update,
             no_update,

@@ -124,6 +124,19 @@ This repo is designed for a standard production setup:
 2. Put authentication in front of the app (reverse proxy or API-layer auth).
 3. Expose a URL like `dashboard.clientsite.com`, or embed via iframe.
 
+### Render (Docker) notes
+
+If you deploy the API and dashboard as separate Render services using
+`Dockerfile.api` and `Dockerfile.dashboard`, set this environment variable
+on the **dashboard** service:
+
+```
+API_BASE=https://<your-api-service>.onrender.com
+```
+
+The dashboard uses `API_BASE` to reach the API in hosted environments.
+Locally it defaults to `http://localhost:8000`.
+
 Common auth options:
 - Username/password via reverse proxy (e.g., Nginx + basic auth or OAuth/SSO).
 - Firm-scoped JWTs enforced by the API.

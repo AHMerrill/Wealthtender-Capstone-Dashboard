@@ -269,9 +269,14 @@ class ArtifactStore:
                 preset="eda",
             )
 
-        base_df = self._apply_macro_filters(**kwargs)
+        base_kwargs = {
+            "scope": kwargs.get("scope"),
+            "firm_id": kwargs.get("firm_id"),
+        }
+        base_df = self._apply_macro_filters(**base_kwargs)
+        filtered_df = self._apply_macro_filters(**kwargs)
         payload = self._macro_payload_from_df(
-            base_df,
+            filtered_df,
             kwargs.get("lexical_top_n", 20),
             lexical_n=kwargs.get("lexical_n", 1),
             exclude_stopwords=kwargs.get("exclude_stopwords", False),
@@ -326,16 +331,32 @@ class ArtifactStore:
             "meta": self._macro_meta(df),
         }
 
-    # ---- remaining macro helpers unchanged in behavior ----
-    # (kept verbatim but safe)
-
     def _macro_meta(self, df: pd.DataFrame) -> Dict[str, Any]:
         if df.empty or "review_date" not in df.columns:
             return {}
+        date_min = df["review_date"].min()
+        date_max = df["review_date"].max()
+        token_min = df["token_count"].min() if "token_count" in df.columns else None
+        token_max = df["token_count"].max() if "token_count" in df.columns else None
+        rating_min = df["rating"].min() if "rating" in df.columns else None
+        rating_max = df["rating"].max() if "rating" in df.columns else None
+        if "advisor_id" in df.columns:
+            review_counts = df.groupby("advisor_id").size()
+            reviews_per_advisor_min = int(review_counts.min())
+            reviews_per_advisor_max = int(review_counts.max())
+        else:
+            reviews_per_advisor_min = None
+            reviews_per_advisor_max = None
         return {
+            "date_min": date_min.isoformat() if pd.notna(date_min) else None,
+            "date_max": date_max.isoformat() if pd.notna(date_max) else None,
             "row_count": int(df.shape[0]),
-            "date_min": df["review_date"].min().isoformat() if pd.notna(df["review_date"].min()) else None,
-            "date_max": df["review_date"].max().isoformat() if pd.notna(df["review_date"].max()) else None,
+            "token_min": int(token_min) if pd.notna(token_min) else None,
+            "token_max": int(token_max) if pd.notna(token_max) else None,
+            "rating_min": float(rating_min) if pd.notna(rating_min) else None,
+            "rating_max": float(rating_max) if pd.notna(rating_max) else None,
+            "reviews_per_advisor_min": reviews_per_advisor_min,
+            "reviews_per_advisor_max": reviews_per_advisor_max,
         }
 
     def _macro_summary(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
@@ -343,14 +364,54 @@ class ArtifactStore:
             return self.macro_eda_summary
         if df.empty:
             return {}
-        return {"reviews": int(df.shape[0])}
+        rating_counts = df["rating"].value_counts(dropna=False).sort_index() if "rating" in df.columns else []
+        return {
+            "reviews": int(df.shape[0]),
+            "advisors": int(df["advisor_id"].nunique()) if "advisor_id" in df.columns else 0,
+            "rating_counts": {str(k): int(v) for k, v in rating_counts.items()}
+            if hasattr(rating_counts, "items")
+            else {},
+            "rev_per_adv_summary": self._review_count_summary(df),
+            "token_count_summary": self._token_count_summary(df),
+            "pct_under_20_tokens": self._pct_under_tokens(df, 20),
+            "pct_under_50_tokens": self._pct_under_tokens(df, 50),
+        }
+
+    def _review_count_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
+        if "advisor_id" not in df.columns:
+            return {}
+        counts = df.groupby("advisor_id").size()
+        return counts.describe().to_dict()
+
+    def _token_count_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
+        if "token_count" not in df.columns:
+            return {}
+        return df["token_count"].describe().to_dict()
+
+    def _pct_under_tokens(self, df: pd.DataFrame, threshold: int) -> float:
+        if "token_count" not in df.columns or df.empty:
+            return 0.0
+        return float((df["token_count"] < threshold).mean())
 
     def _macro_quality(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
         if preset == "eda" and self.macro_quality_summary:
             return self.macro_quality_summary
         if df.empty:
             return {}
-        return {"n_rows": int(df.shape[0]), "n_cols": int(df.shape[1])}
+        rating_missing_frac = float(df["rating"].isna().mean()) if "rating" in df.columns else 0.0
+        text_empty_frac = float(df["review_text_clean"].isna().mean()) if "review_text_clean" in df.columns else 0.0
+        date_min = df["review_date"].min() if "review_date" in df.columns else None
+        date_max = df["review_date"].max() if "review_date" in df.columns else None
+        return {
+            "n_rows": int(df.shape[0]),
+            "n_cols": int(df.shape[1]),
+            "n_advisors": int(df["advisor_id"].nunique()) if "advisor_id" in df.columns else 0,
+            "n_names": int(df["reviewer_name"].nunique()) if "reviewer_name" in df.columns else 0,
+            "date_min": date_min.isoformat() if pd.notna(date_min) else None,
+            "date_max": date_max.isoformat() if pd.notna(date_max) else None,
+            "rating_missing_frac": rating_missing_frac,
+            "text_empty_frac": text_empty_frac,
+        }
 
     def _macro_coverage(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
         if preset == "eda" and self.macro_coverage:
@@ -358,7 +419,14 @@ class ArtifactStore:
         if df.empty or "advisor_id" not in df.columns:
             return {}
         counts = df.groupby("advisor_id").size()
-        return {"advisors_total": int(counts.shape[0])}
+        return {
+            "advisors_total": int(counts.shape[0]),
+            "pct_advisors_lt3": float((counts < 3).mean()),
+            "pct_advisors_lt5": float((counts < 5).mean()),
+            "pct_advisors_lt10": float((counts < 10).mean()),
+            "median_reviews_per_advisor": float(counts.median()),
+            "p90_reviews_per_advisor": float(counts.quantile(0.9)),
+        }
 
     def _macro_rating_distribution(self, df: pd.DataFrame) -> List[Dict]:
         if df.empty or "rating" not in df.columns:
