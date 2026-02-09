@@ -21,7 +21,7 @@ def macro_content():
                 children=[
                     html.Div(
                         className="section-header",
-                        children=[html.H2("Macro Insights")],
+                        children=[html.H2("EDA")],
                     ),
                 ],
             ),
@@ -154,6 +154,8 @@ def update_macro_insights(
             empty_fig,
             empty_fig,
             empty_fig,
+            empty_fig,
+            no_update,
             no_update,
             no_update,
             no_update,

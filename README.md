@@ -91,7 +91,7 @@ but will use your default `python3` if not.
 
 - `api/` FastAPI service that reads artifacts and exposes firm/advisor endpoints.
 - `dashboard/` Dash app (multi-page) that calls the API.
-- `artifacts/` Real artifacts (Macro Insights + manifest in `artifacts/metadata.json`).
+- `artifacts/` Real artifacts (EDA + manifest in `artifacts/metadata.json`).
 - `data_contract/` Data contract and schema expectations.
 - `docs/` Brandbook and project docs.
 
@@ -99,11 +99,11 @@ but will use your default `python3` if not.
 
 - Auth is stubbed. The dashboard currently uses a firm selector to simulate firm scoping.
 - Artifacts are loaded via the API. The dashboard does not read files directly.
-- Macro Insights charts are built from `artifacts/macro_insights/**` (moved from the EDA outputs).
+- EDA charts are built from `artifacts/macro_insights/**` (moved from the EDA outputs).
 
-## Macro Insights Data
+## EDA Data
 
-The Macro Insights view is generated from these artifact files:
+The EDA view is generated from these artifact files:
 
 - `artifacts/macro_insights/reviews_clean.csv`
 - `artifacts/macro_insights/eda/eda_summary.json`

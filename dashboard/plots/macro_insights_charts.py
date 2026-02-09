@@ -15,8 +15,20 @@ def _apply_base_layout(fig: go.Figure, height: int = 360) -> go.Figure:
 
 
 def rating_distribution_chart(distribution: list[dict], palette: list[str]) -> go.Figure:
-    labels = [d["rating"] for d in distribution]
-    counts = [d["count"] for d in distribution]
+    def _rating_sort_key(label):
+        if label is None:
+            return (-1, -1)
+        text = str(label).strip().lower()
+        if text == "nan":
+            return (-1, -1)
+        try:
+            return (0, float(text))
+        except ValueError:
+            return (1, text)
+
+    ordered = sorted(distribution, key=lambda d: _rating_sort_key(d.get("rating")))
+    labels = [d.get("rating") for d in ordered]
+    counts = [d.get("count") for d in ordered]
     colors = [palette[i % len(palette)] for i in range(len(labels))]
     fig = go.Figure(
         data=[go.Bar(x=labels, y=counts, marker_color=colors, text=counts, textposition="outside")]

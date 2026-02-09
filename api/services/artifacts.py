@@ -25,6 +25,7 @@ STOPWORDS = {
     "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until",
     "up", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom",
     "why", "with", "you", "your", "yours", "yourself", "yourselves",
+    "amp", "nbsp",
 }
 
 
@@ -511,7 +512,8 @@ class ArtifactStore:
 
         counter = Counter()
         for text in df["review_text_clean"].dropna().astype(str):
-            parts = re.findall(r"[a-z0-9']+", text.lower())
+            cleaned = re.sub(r"&[a-z]+;", " ", text.lower())
+            parts = re.findall(r"[a-z0-9']+", cleaned)
             if exclude_stopwords:
                 parts = [p for p in parts if p not in STOPWORDS]
             if lexical_n == 1:
