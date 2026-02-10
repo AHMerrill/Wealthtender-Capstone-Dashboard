@@ -63,7 +63,7 @@ def firm_personas(firm_id: str):
 
 
 @app.get("/api/macro-insights/charts")
-def macro_insights_charts(
+def eda_charts(
     scope: str = "global",
     firm_id: Optional[str] = None,
     date_start: Optional[str] = None,
@@ -78,7 +78,7 @@ def macro_insights_charts(
     exclude_stopwords: Optional[bool] = False,
     preset: Optional[str] = None,
 ):
-    payload = store.macro_insights_payload(
+    payload = store.eda_payload(
         scope=scope,
         firm_id=firm_id,
         date_start=date_start,

@@ -291,10 +291,10 @@ class ArtifactStore:
         return personas.to_dict(orient="records")
 
     # ----------------------------------------------------------------------------------
-    # Macro insights
+    # EDA (macro insights)
     # ----------------------------------------------------------------------------------
 
-    def macro_insights_payload(self, **kwargs) -> Dict[str, Any]:
+    def eda_payload(self, **kwargs) -> Dict[str, Any]:
         if self.macro_reviews_clean.empty:
             return {}
 

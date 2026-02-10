@@ -1,7 +1,7 @@
 from dash import html, dcc, callback, Input, Output, no_update
 import plotly.graph_objects as go
 
-from dashboard.services.api import get_macro_insights, get_review_detail
+from dashboard.services.api import get_eda_charts, get_review_detail
 from dashboard.services.brand import get_dataviz_palette
 from dashboard.plots.macro_insights_charts import (
     rating_distribution_chart,
@@ -106,7 +106,7 @@ def macro_content():
     Input("macro-ngram-topn", "value"),
     Input("macro-exclude-stopwords", "value"),
 )
-def update_macro_insights(
+def update_eda_charts(
     scope,
     firm_id,
     start_date,
@@ -141,7 +141,7 @@ def update_macro_insights(
         params["lexical_top_n"] = ngram_topn
     params["exclude_stopwords"] = bool(exclude_stopwords)
 
-    payload = get_macro_insights(params)
+    payload = get_eda_charts(params)
     if not payload:
         empty_fig = go.Figure()
         empty_figs = [empty_fig] * 6

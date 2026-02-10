@@ -8,7 +8,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def _get(path: str, params: Optional[Dict] = None):
     try:
-        resp = requests.get(f"{API_BASE}{path}", params=params, timeout=2)
+        resp = requests.get(f"{API_BASE}{path}", params=params, timeout=15)
         if resp.status_code == 200:
             return resp.json()
     except Exception:
@@ -31,7 +31,7 @@ def get_firm_dimensions(firm_id: str):
     return data if data else []
 
 
-def get_macro_insights(params: dict):
+def get_eda_charts(params: dict):
     data = _get("/api/macro-insights/charts", params=params)
     return data if data else {}
 
