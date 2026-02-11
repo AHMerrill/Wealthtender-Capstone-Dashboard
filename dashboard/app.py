@@ -18,6 +18,9 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# In local debug mode (python -m dashboard.app) this thread warms the API.
+# Under Gunicorn, this thread runs in the master and dies at fork -- the
+# gunicorn.conf.py post_fork hook starts a fresh thread in each worker.
 threading.Thread(target=warm_api, daemon=True).start()
 
 # ---------------------------------------------------------------------------
@@ -71,7 +74,17 @@ def _get_role_and_firm(data):
     role = data.get("role")
     if role not in ROLES:
         return None, None
-    return role, data.get("firm_id")
+    firm_id = data.get("firm_id")
+    if firm_id is not None and not isinstance(firm_id, str):
+        firm_id = str(firm_id)
+    return role, firm_id
+
+
+def _norm(pathname):
+    """Normalise pathname so double-slashes don't break routing."""
+    if not pathname:
+        return "/"
+    return "/" + pathname.strip("/")
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +381,7 @@ app.layout = html.Div(
     Input("user-role", "data"),
 )
 def render_nav(pathname, user_role_data):
+    pathname = _norm(pathname)
     role, _ = _get_role_and_firm(user_role_data)
     if not role:
         return (
@@ -396,6 +410,7 @@ def render_nav(pathname, user_role_data):
     prevent_initial_call=True,
 )
 def navigate_on_role_change(user_role_data, current_path):
+    current_path = _norm(current_path)
     role, _ = _get_role_and_firm(user_role_data)
     log.info("navigate_on_role_change: role=%s  path=%s", role, current_path)
     if not role:
@@ -459,8 +474,11 @@ def load_firm_options(user_role_data, already_loaded, cur_value):
     firms = get_firms()
     opts = [{"label": f["firm_id"], "value": f["firm_id"]} for f in firms]
     if not opts:
+        # API unreachable or no firms -- allow retry on next role change
         opts = [{"label": "No firms available",
                  "value": "__none__", "disabled": True}]
+        log.info("load_firm_options: no firms (API down?), will retry")
+        return opts, no_update, False
     if firm_id and any(o["value"] == firm_id for o in opts):
         default = firm_id
     else:
@@ -483,6 +501,7 @@ def load_firm_options(user_role_data, already_loaded, cur_value):
     Input("user-role", "data"),
 )
 def update_sidebar(pathname, user_role_data):
+    pathname = _norm(pathname)
     role, firm_id = _get_role_and_firm(user_role_data)
     hide = {"display": "none"}
 
@@ -544,6 +563,7 @@ def toggle_stopword_panel(exclude_checked, cur_opts):
     Output("eda-sw-default-list-wrap", "style"),
     Output("eda-sw-toggle-btn", "children"),
     Input("eda-sw-toggle-btn", "n_clicks"),
+    prevent_initial_call=True,
 )
 def toggle_sw_list(n_clicks):
     if (n_clicks or 0) % 2 == 1:
@@ -558,6 +578,7 @@ def toggle_sw_list(n_clicks):
     Input("eda-extra-stopwords", "search_value"),
     Input("eda-extra-stopwords", "value"),
     State("eda-extra-stopwords", "options"),
+    prevent_initial_call=True,
 )
 def update_extra_sw_options(search, selected, current_opts):
     """Keep options in sync with whatever the user has typed/selected.
@@ -586,6 +607,7 @@ def update_extra_sw_options(search, selected, current_opts):
     Input("eda-sw-defaults", "value"),
     Input("eda-extra-stopwords", "value"),
     Input("eda-exclude-stopwords", "value"),
+    prevent_initial_call=True,
 )
 def merge_stopwords(defaults_checked, extras_selected, exclude_checked):
     is_on = "exclude" in (exclude_checked or [])
@@ -612,19 +634,6 @@ def merge_stopwords(defaults_checked, extras_selected, exclude_checked):
     return words
 
 
-# ---------- Reset slider init on scope / firm change ----------
-
-@callback(
-    Output("eda-sliders-initialized", "data", allow_duplicate=True),
-    Input("eda-scope", "value"),
-    Input("firm-dropdown", "value"),
-    prevent_initial_call=True,
-)
-def reset_slider_init(_scope, _firm):
-    """When scope or firm changes, force sliders to re-snap to full range."""
-    return False
-
-
 # ---------- Content-shell layout mode ----------
 
 @callback(
@@ -637,6 +646,7 @@ def reset_slider_init(_scope, _firm):
     Input("user-role", "data"),
 )
 def toggle_content(pathname, user_role_data):
+    pathname = _norm(pathname)
     role, _ = _get_role_and_firm(user_role_data)
     hide = {"display": "none"}
     show = {"display": "block"}

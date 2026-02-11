@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +47,7 @@ def firms():
 @app.get("/api/firm/{firm_id}/summary")
 def firm_summary(firm_id: str):
     summary = store.firm_summary(firm_id)
-    if not summary:
+    if summary is None:
         raise HTTPException(status_code=404, detail="firm not found")
     return summary
 
@@ -104,21 +104,27 @@ def stopwords():
 
 @app.get("/api/eda/charts")
 def eda_charts(
-    scope: str = "global",
+    scope: Literal["global", "firm"] = "global",
     firm_id: Optional[str] = None,
     date_start: Optional[str] = None,
     date_end: Optional[str] = None,
-    rating: Optional[float] = None,
-    min_tokens: Optional[int] = None,
-    max_tokens: Optional[int] = None,
-    min_reviews_per_advisor: Optional[int] = None,
-    max_reviews_per_advisor: Optional[int] = None,
-    lexical_n: Optional[int] = 1,
-    lexical_top_n: Optional[int] = 20,
+    rating: Optional[float] = Query(None, ge=0.0, le=5.0),
+    min_tokens: Optional[int] = Query(None, ge=0),
+    max_tokens: Optional[int] = Query(None, ge=0),
+    min_reviews_per_advisor: Optional[int] = Query(None, ge=0),
+    max_reviews_per_advisor: Optional[int] = Query(None, ge=0),
+    lexical_n: Optional[int] = Query(1, ge=1, le=5),
+    lexical_top_n: Optional[int] = Query(20, ge=1, le=500),
     exclude_stopwords: Optional[bool] = False,
     custom_stopwords: Optional[List[str]] = Query(None),
     preset: Optional[str] = None,
 ):
+    if scope == "firm" and not firm_id:
+        raise HTTPException(
+            status_code=400,
+            detail="firm_id is required when scope is 'firm'",
+        )
+
     payload = store.eda_payload(
         scope=scope,
         firm_id=firm_id,
@@ -147,6 +153,6 @@ def eda_charts(
 @app.get("/api/reviews/{review_id}")
 def review_detail(review_id: str):
     detail = store.review_detail(review_id)
-    if not detail:
+    if detail is None:
         raise HTTPException(status_code=404, detail="review not found")
     return detail

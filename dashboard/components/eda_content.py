@@ -136,6 +136,12 @@ def update_eda_charts(
     if pathname != "/eda":
         raise dash.exceptions.PreventUpdate
 
+    # If scope or firm changed, reset the slider init flag so we re-snap
+    # to the new data range rather than sending stale slider values.
+    triggered = {t["prop_id"].split(".")[0] for t in dash.callback_context.triggered}
+    if {"eda-scope", "firm-dropdown"} & triggered:
+        sliders_initialized = False
+
     palette = get_dataviz_palette()
 
     # -- Build API query params --
@@ -146,7 +152,7 @@ def update_eda_charts(
         params["date_start"] = start_date
     if end_date:
         params["date_end"] = end_date
-    if rating_value != "all":
+    if rating_value and rating_value != "all":
         params["rating"] = rating_value
     # Only send slider values as filters AFTER the first successful load.
     # On the first fire the sliders still hold layout placeholders (e.g.
@@ -311,7 +317,10 @@ def _fmt_int(value) -> str:
 def _pct(value) -> str:
     if value is None:
         return "\u2014"
-    return f"{value * 100:.1f}%"
+    try:
+        return f"{float(value) * 100:.1f}%"
+    except (TypeError, ValueError):
+        return "\u2014"
 
 
 def _review_placeholder(message: str):

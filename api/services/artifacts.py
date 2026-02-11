@@ -1,10 +1,21 @@
 import json
+import logging
 import re
 from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 import pandas as pd
+
+log = logging.getLogger(__name__)
+
+
+def _sanitize_records(df: pd.DataFrame) -> list:
+    """Convert DataFrame to list of dicts with NaN replaced by None.
+
+    This ensures valid JSON (NaN is not a valid JSON value).
+    """
+    return df.where(df.notna(), None).to_dict(orient="records")
 
 # --------------------------------------------------------------------------------------
 # Paths / constants
@@ -107,8 +118,13 @@ class ArtifactStore:
 
     def _load_metadata(self) -> dict:
         if not self.metadata_path.exists():
+            log.warning("metadata.json not found at %s", self.metadata_path)
             return {"artifact_manifest": []}
-        return json.loads(self.metadata_path.read_text())
+        try:
+            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            log.error("Failed to load metadata.json: %s", exc)
+            return {"artifact_manifest": []}
 
     def _get_manifest_item(self, name: str) -> Optional[dict]:
         manifest = {
@@ -125,19 +141,22 @@ class ArtifactStore:
         path = ROOT / item.get("path", "")
         file_type = item.get("type")
 
-        if not path.exists():
+        if not path.is_file():
+            log.warning("Artifact '%s' not found at %s", name, path)
             return pd.DataFrame()
 
         try:
             if file_type == "csv":
-                return pd.read_csv(path)
+                return pd.read_csv(path, encoding="utf-8")
             if file_type == "json":
-                return pd.DataFrame(json.loads(path.read_text()))
+                return pd.DataFrame(json.loads(path.read_text(encoding="utf-8")))
             if file_type == "parquet":
                 return pd.read_parquet(path)
-        except Exception:
+        except Exception as exc:
+            log.error("Failed to load artifact '%s' from %s: %s", name, path, exc)
             return pd.DataFrame()
 
+        log.warning("Unknown file type '%s' for artifact '%s'", file_type, name)
         return pd.DataFrame()
 
     def _load_json(self, name: str) -> dict:
@@ -145,11 +164,14 @@ class ArtifactStore:
         if not item:
             return {}
         path = ROOT / item.get("path", "")
-        if path.exists():
+        if path.is_file():
             try:
-                return json.loads(path.read_text())
-            except Exception:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                log.error("Failed to load JSON artifact '%s' from %s: %s",
+                          name, path, exc)
                 return {}
+        log.warning("JSON artifact '%s' not found at %s", name, path)
         return {}
 
     # ----------------------------------------------------------------------------------
@@ -217,7 +239,7 @@ class ArtifactStore:
             .reset_index()
             .sort_values("score", ascending=False)
         )
-        return summary.to_dict(orient="records")
+        return _sanitize_records(summary)
 
     def firm_advisors(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms:
@@ -230,7 +252,7 @@ class ArtifactStore:
             .mean(numeric_only=True)
             .reset_index()
         )
-        return summary.to_dict(orient="records")
+        return _sanitize_records(summary)
 
     def advisor_detail(self, firm_id: str, advisor_id: str) -> Optional[Dict]:
         if not self.has_firms:
@@ -249,8 +271,8 @@ class ArtifactStore:
         return {
             "advisor_id": advisor_id,
             "firm_id": firm_id,
-            "scores": df.to_dict(orient="records"),
-            "themes": themes.to_dict(orient="records"),
+            "scores": _sanitize_records(df),
+            "themes": _sanitize_records(themes),
         }
 
     def review_detail(self, review_id: str) -> Optional[Dict[str, Any]]:
@@ -292,7 +314,7 @@ class ArtifactStore:
     def firm_benchmarks(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms or self.benchmarks.empty:
             return None
-        return self.benchmarks.to_dict(orient="records")
+        return _sanitize_records(self.benchmarks)
 
     def firm_personas(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms:
@@ -306,7 +328,7 @@ class ArtifactStore:
             .reset_index()
             .assign(persona=lambda d: d["score"].apply(_score_to_persona))
         )
-        return personas.to_dict(orient="records")
+        return _sanitize_records(personas)
 
     # ----------------------------------------------------------------------------------
     # EDA
@@ -523,7 +545,7 @@ class ArtifactStore:
         if df.empty or "rating" not in df.columns or "token_count" not in df.columns:
             return []
         subset = df.dropna(subset=["rating", "token_count"])
-        records = subset[["rating", "token_count"]].to_dict(orient="records")
+        records = _sanitize_records(subset[["rating", "token_count"]])
         if "ID" in df.columns:
             ids = subset["ID"].astype(str).tolist()
             for record, review_id in zip(records, ids):
@@ -536,7 +558,7 @@ class ArtifactStore:
                      custom_stopwords: Optional[List[str]] = None) -> Dict[str, Any]:
 
         if preset == "eda":
-            return {"top_ngrams": self.macro_top_tokens.to_dict(orient="records")}
+            return {"top_ngrams": _sanitize_records(self.macro_top_tokens)}
 
         if df.empty or "review_text_clean" not in df.columns:
             return {"top_ngrams": []}

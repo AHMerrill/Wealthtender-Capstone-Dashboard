@@ -20,8 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ---- Copy app code ----
 COPY . .
 
-# ---- Expose port (Render sets $PORT) ----
+# ---- Expose port ----
+# Local: 8050 (default), Render: 10000 (injected via $PORT)
 EXPOSE 8050
+EXPOSE 10000
 
 # ---- Start Dash via Gunicorn ----
 CMD gunicorn dashboard.app:server \

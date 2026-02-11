@@ -1,6 +1,15 @@
 import plotly.graph_objects as go
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _pc(palette: list[str], idx: int, fallback: str = "#6b7280") -> str:
+    """Safe palette color access -- never raises IndexError."""
+    return palette[idx] if idx < len(palette) else fallback
+
+
 def _apply_base_layout(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_layout(
         height=height,
@@ -16,14 +25,37 @@ def _apply_base_layout(fig: go.Figure, height: int = 360) -> go.Figure:
 
 def _add_bar_headroom(fig: go.Figure, counts: list) -> go.Figure:
     """Expand y-axis so textposition='outside' labels don't clip."""
-    if counts:
-        max_val = max(c for c in counts if c is not None) if counts else 0
+    filtered = [c for c in counts if c is not None]
+    if filtered:
+        max_val = max(filtered)
         if max_val > 0:
             fig.update_layout(yaxis_range=[0, max_val * 1.18])
     return fig
 
 
+def _empty_figure(annotation: str = "") -> go.Figure:
+    """A blank chart with an optional centred message."""
+    fig = go.Figure()
+    fig.update_layout(
+        height=200, margin=dict(l=24, r=24, t=24, b=24),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        annotations=[dict(
+            text=annotation, xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=14, color="#6b7280"),
+        )] if annotation else [],
+    )
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Chart functions — all use .get() with defaults to survive missing keys
+# ---------------------------------------------------------------------------
+
 def rating_distribution_chart(distribution: list[dict], palette: list[str]) -> go.Figure:
+    if not distribution:
+        return _empty_figure("No rating data")
+
     def _rating_sort_key(label):
         if label is None:
             return (-1, -1)
@@ -36,9 +68,9 @@ def rating_distribution_chart(distribution: list[dict], palette: list[str]) -> g
             return (1, text)
 
     ordered = sorted(distribution, key=lambda d: _rating_sort_key(d.get("rating")))
-    labels = [d.get("rating") for d in ordered]
-    counts = [d.get("count") for d in ordered]
-    colors = [palette[i % len(palette)] for i in range(len(labels))]
+    labels = [d.get("rating", "") for d in ordered]
+    counts = [d.get("count", 0) for d in ordered]
+    colors = [_pc(palette, i % len(palette)) for i in range(len(labels))]
     fig = go.Figure(
         data=[go.Bar(x=labels, y=counts, marker_color=colors, text=counts, textposition="outside")]
     )
@@ -48,14 +80,17 @@ def rating_distribution_chart(distribution: list[dict], palette: list[str]) -> g
 
 
 def reviews_over_time_chart(series: list[dict], palette: list[str]) -> go.Figure:
-    x = [d["period"] for d in series]
-    y = [d["count"] for d in series]
+    if not series:
+        return _empty_figure("No time-series data")
+
+    x = [d.get("period", "") for d in series]
+    y = [d.get("count", 0) for d in series]
     fig = go.Figure(
         data=[go.Scatter(
             x=x, y=y,
             mode="lines+markers",
-            line=dict(color=palette[0], width=2.5),
-            marker=dict(color=palette[1], size=6),
+            line=dict(color=_pc(palette, 0), width=2.5),
+            marker=dict(color=_pc(palette, 1), size=6),
         )]
     )
     fig.update_layout(xaxis_title="Month", yaxis_title="Reviews")
@@ -63,38 +98,47 @@ def reviews_over_time_chart(series: list[dict], palette: list[str]) -> go.Figure
 
 
 def reviews_per_advisor_hist(counts: list[int], median: float, p90: float, palette: list[str]) -> go.Figure:
-    fig = go.Figure(data=[go.Histogram(x=counts, marker_color=palette[1])])
+    if not counts:
+        return _empty_figure("No reviews-per-advisor data")
+
+    fig = go.Figure(data=[go.Histogram(x=counts, marker_color=_pc(palette, 1))])
     fig.update_layout(xaxis_title="Reviews per advisor", yaxis_title="Advisor count", bargap=0.05)
     if median is not None:
-        fig.add_vline(x=median, line_dash="dash", line_color=palette[0], annotation_text="Median")
+        fig.add_vline(x=median, line_dash="dash", line_color=_pc(palette, 0), annotation_text="Median")
     if p90 is not None:
-        fig.add_vline(x=p90, line_dash="dot", line_color=palette[6], annotation_text="P90")
+        fig.add_vline(x=p90, line_dash="dot", line_color=_pc(palette, 6), annotation_text="P90")
     return _apply_base_layout(fig)
 
 
 def token_count_hist(counts: list[int], palette: list[str]) -> go.Figure:
-    fig = go.Figure(data=[go.Histogram(x=counts, marker_color=palette[4])])
+    if not counts:
+        return _empty_figure("No token data")
+
+    fig = go.Figure(data=[go.Histogram(x=counts, marker_color=_pc(palette, 4))])
     fig.update_layout(xaxis_title="Token count", yaxis_title="Reviews", bargap=0.05)
     return _apply_base_layout(fig)
 
 
 def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure:
-    x = [d["token_count"] for d in points]
-    y = [d["rating"] for d in points]
+    if not points:
+        return _empty_figure("No scatter data")
+
+    x = [d.get("token_count", 0) for d in points]
+    y = [d.get("rating", 0) for d in points]
     custom = [d.get("review_id") for d in points]
     fig = go.Figure(
         data=[
-            go.Scatter(
+            go.Scattergl(
                 x=x,
                 y=y,
                 mode="markers",
                 customdata=custom,
                 hovertemplate="Tokens: %{x}<br>Rating: %{y}<extra></extra>",
                 marker=dict(
-                    color=palette[1],
+                    color=_pc(palette, 1),
                     size=7,
                     opacity=0.65,
-                    line=dict(width=0.5, color=palette[0]),
+                    line=dict(width=0.5, color=_pc(palette, 0)),
                 ),
             )
         ]
@@ -104,15 +148,16 @@ def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure
 
 
 def lexical_bar_chart(items: list[dict], label_key: str, palette: list[str]) -> go.Figure:
-    labels = [d[label_key] for d in items]
-    counts = [d["count"] for d in items]
-    # Gradient through the blue range of the palette for a cohesive look
+    if not items:
+        return _empty_figure("No lexical data")
+
+    labels = [d.get(label_key, "") for d in items]
+    counts = [d.get("count", 0) for d in items]
     n = len(labels)
     if n <= len(palette):
-        colors = [palette[i % len(palette)] for i in range(n)]
+        colors = [_pc(palette, i % len(palette)) for i in range(n)]
     else:
-        # For many bars, interpolate between primary and secondary brand blue
-        colors = _interpolate_colors(palette[0], palette[1], n)
+        colors = _interpolate_colors(_pc(palette, 0), _pc(palette, 1), n)
     fig = go.Figure(
         data=[go.Bar(
             x=labels, y=counts,
@@ -131,6 +176,10 @@ def lexical_bar_chart(items: list[dict], label_key: str, palette: list[str]) -> 
     return _apply_base_layout(fig, height=400)
 
 
+# ---------------------------------------------------------------------------
+# Color interpolation
+# ---------------------------------------------------------------------------
+
 def _interpolate_colors(hex_a: str, hex_b: str, n: int) -> list[str]:
     """Generate n colors interpolated between two hex colors."""
     def _hex_to_rgb(h: str):
@@ -138,7 +187,7 @@ def _interpolate_colors(hex_a: str, hex_b: str, n: int) -> list[str]:
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
     def _rgb_to_hex(r, g, b):
-        return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
+        return f"#{round(r):02x}{round(g):02x}{round(b):02x}"
 
     ra, ga, ba = _hex_to_rgb(hex_a)
     rb, gb, bb = _hex_to_rgb(hex_b)

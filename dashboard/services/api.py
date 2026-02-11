@@ -8,9 +8,12 @@ dashboard with empty data.
 from typing import Optional, Dict, Any
 import logging
 import os
+import threading
 import time
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +24,9 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 # ---------------------------------------------------------------------------
 
 _session = requests.Session()
+_retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504])
+_session.mount("http://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
+_session.mount("https://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
 
 
 def _get(path: str, params: Optional[Dict] = None, timeout: int = 30) -> Any:
@@ -73,7 +79,8 @@ def get_review_detail(review_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 _api_ready = False
-_warm_started = False   # ensure only one worker runs warm-up
+_warm_lock = threading.Lock()
+_warm_started = False
 
 
 def is_api_ready() -> bool:
@@ -102,11 +109,11 @@ def warm_api(
     """
     global _api_ready, _warm_started
 
-    # Only let one gunicorn worker run warm-up (both import this module,
-    # but the flag is per-process so only the first thread wins).
-    if _warm_started:
-        return
-    _warm_started = True
+    # Thread-safe: only the first thread to acquire the lock runs warm-up.
+    with _warm_lock:
+        if _warm_started:
+            return
+        _warm_started = True
 
     url = f"{API_BASE}/api/health"
 

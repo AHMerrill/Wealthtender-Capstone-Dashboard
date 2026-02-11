@@ -1,9 +1,23 @@
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
+dist/
+build/
 .DS_Store
+.env
+*.log
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets / local-only
 wt_dash_secrets.txt
+
+# Non-project dirs
 eda/
 project_definition_guide/
 Brandbook/
