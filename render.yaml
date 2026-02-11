@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PORT
         value: "10000"
+      - key: API_KEY
+        sync: false  # set the same value on both services via Render dashboard
 
   # ---- Dash frontend ----
   - type: web
@@ -19,5 +21,7 @@ services:
     envVars:
       - key: API_BASE
         value: "https://wt-api-hdji.onrender.com"
+      - key: API_KEY
+        sync: false  # must match the API service's API_KEY
       - key: ADMIN_PASSWORD
         sync: false  # set manually in Render dashboard — don't commit secrets

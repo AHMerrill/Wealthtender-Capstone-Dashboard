@@ -1,7 +1,9 @@
+import os
 from typing import Optional, List, Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from api.services.artifacts import ArtifactStore, STOPWORDS_SORTED
 
 app = FastAPI(title="Wealthtender Dashboard API", version="0.1.0")
@@ -13,6 +15,34 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# API key auth
+# ---------------------------------------------------------------------------
+# Set API_KEY on both the API and dashboard services. When set, every request
+# (except /api/health) must include an X-API-Key header with the matching
+# value. When not set (local dev), all requests are allowed.
+
+_API_KEY = os.environ.get("API_KEY", "")
+
+
+@app.middleware("http")
+async def verify_api_key(request: Request, call_next):
+    # Health endpoint is always open (needed for Render health checks)
+    if request.url.path == "/api/health":
+        return await call_next(request)
+    # If no key is configured, skip auth (local dev convenience)
+    if not _API_KEY:
+        return await call_next(request)
+    # Check the header
+    provided = request.headers.get("X-API-Key", "")
+    if provided != _API_KEY:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or missing API key"},
+        )
+    return await call_next(request)
+
 
 store = ArtifactStore()
 

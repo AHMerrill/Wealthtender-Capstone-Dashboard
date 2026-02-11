@@ -55,10 +55,12 @@ docs/                 Brandbook and project docs
 
 See `.env.example` for all settings. Defaults work out of the box for local dev.
 
-| Variable   | Default                 | Description                              |
-|------------|-------------------------|------------------------------------------|
-| `API_BASE` | `http://localhost:8000` | URL the dashboard uses to reach the API  |
-| `PORT`     | `8050` / `8000`         | Listening port for dashboard / API       |
+| Variable         | Default                 | Where       | Description                                            |
+|------------------|-------------------------|-------------|--------------------------------------------------------|
+| `API_BASE`       | `http://localhost:8000` | Dashboard   | URL the dashboard uses to reach the API                |
+| `PORT`           | `8050` / `8000`         | Both        | Listening port (Render injects this automatically)     |
+| `API_KEY`        | *(empty — auth off)*    | Both        | Shared secret; API rejects requests without it         |
+| `ADMIN_PASSWORD` | `WT$msba2026`           | Dashboard   | Password for the admin portal on the splash page       |
 
 ## Docker Compose (alternative)
 
@@ -77,17 +79,42 @@ Both services are containerized and deploy to any Docker-compatible host (Render
 1. Deploy the API service using `Dockerfile.api`.
 2. Deploy the dashboard service using `Dockerfile.dashboard`.
 3. Set `API_BASE` on the dashboard to the API's public URL.
+4. Generate a random `API_KEY` and set the **same value** on both services.
+5. Set `ADMIN_PASSWORD` on the dashboard to your chosen admin password.
 
 A `render.yaml` blueprint is included if using Render, but it is not the only option.
 
-## Auth
+## Auth & Security
 
-The splash page currently uses a role selector for demo purposes (Admin vs. Firm Portal). In production, replace this with your auth provider and inject the user's role and `firm_id` from the session.
+The project has two layers of authentication:
 
-Common approaches:
-- Reverse proxy auth (Nginx + OAuth2 Proxy, SSO)
-- Firm-scoped JWTs enforced by API middleware
-- SSO at the hosting layer (Cloudflare Access, etc.)
+### 1. API Key (service-to-service)
+
+The API rejects any request without a valid `X-API-Key` header. The dashboard sends this header automatically. Both services read the key from the `API_KEY` environment variable. When `API_KEY` is empty (local dev), auth is skipped.
+
+**To enable on Render:** set the same `API_KEY` value on both the `wt-api` and `wt-dash` services in the Render dashboard. The `/api/health` endpoint is always open (needed for health checks).
+
+### 2. Admin Password (user-facing)
+
+The admin portal on the splash page requires a password. The password is read from the `ADMIN_PASSWORD` env var (defaults to `WT$msba2026`). The check is server-side — not bypassable from the browser.
+
+### Production Handoff
+
+When handing this project to Wealthtender's engineering team, here's what to change:
+
+| Component | Current | Replace With |
+|-----------|---------|-------------|
+| **Admin login** (`dashboard/pages/splash.py`) | Shared password | SSO redirect (Okta, Auth0, Azure AD, etc.) |
+| **Role assignment** (`splash.py` → `user-role` store) | User clicks a card | Role injected from SSO identity token |
+| **Firm ID** (`splash.py` → `user-role` store) | User picks from dropdown | Firm ID from SSO claims or database lookup |
+| **API auth** (`api/main.py` middleware) | Shared API key in header | JWT validation or OAuth2 client credentials |
+| **CORS origins** (`api/main.py`) | `allow_origins=["*"]` | Restrict to the dashboard's production domain |
+
+**Key files to touch:**
+- `dashboard/pages/splash.py` — replace the password form and firm picker with SSO redirect
+- `dashboard/roles.py` — role definitions and page permissions (may need new roles)
+- `api/main.py` — swap the `X-API-Key` middleware for JWT/OAuth validation
+- `dashboard/app.py` — the `user-role` `dcc.Store` and `_get_role_and_firm()` are the central auth seam
 
 ## EDA Artifacts
 

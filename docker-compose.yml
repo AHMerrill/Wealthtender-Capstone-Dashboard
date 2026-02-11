@@ -17,6 +17,7 @@ services:
       - "8000:8000"
     environment:
       PORT: "8000"
+      API_KEY: "${API_KEY:-}"  # optional; set in .env to enable
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
@@ -32,6 +33,7 @@ services:
     environment:
       PORT: "8050"
       API_BASE: "http://api:8000"
+      API_KEY: "${API_KEY:-}"  # must match the API service
     depends_on:
       api:
         condition: service_healthy

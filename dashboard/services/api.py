@@ -18,6 +18,7 @@ from urllib3.util.retry import Retry
 log = logging.getLogger(__name__)
 
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
+API_KEY = os.getenv("API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Low-level helpers
@@ -27,6 +28,10 @@ _session = requests.Session()
 _retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504])
 _session.mount("http://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
 _session.mount("https://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
+
+# Attach API key header to every request when configured.
+if API_KEY:
+    _session.headers["X-API-Key"] = API_KEY
 
 
 def _get(path: str, params: Optional[Dict] = None, timeout: int = 30) -> Any:
