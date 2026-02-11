@@ -38,10 +38,15 @@ if API_KEY:
 
 def _get(path: str, params: Optional[Dict] = None, timeout: int = 30) -> Any:
     """GET an API endpoint and return parsed JSON, or None on failure."""
+    global _api_ready
     url = f"{API_BASE}{path}"
     try:
         resp = _session.get(url, params=params, timeout=timeout)
         if resp.status_code == 200:
+            # Mark the API as ready so the status banner clears, even if
+            # the warm-up thread hasn't finished its own health check yet.
+            if not _api_ready:
+                _api_ready = True
             return resp.json()
         if resp.status_code == 429:
             # Rate-limited (common during Render cold start) — return None
