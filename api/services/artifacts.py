@@ -430,23 +430,36 @@ class ArtifactStore:
         token_max = df["token_count"].max() if "token_count" in df.columns else None
         rating_min = df["rating"].min() if "rating" in df.columns else None
         rating_max = df["rating"].max() if "rating" in df.columns else None
+
+        # Quartiles for dynamic category filters (Low / Medium / High)
+        token_q1 = token_q3 = None
+        if "token_count" in df.columns and not df["token_count"].dropna().empty:
+            token_q1 = int(df["token_count"].quantile(0.25))
+            token_q3 = int(df["token_count"].quantile(0.75))
+
+        reviews_per_advisor_min = reviews_per_advisor_max = None
+        rpa_q1 = rpa_q3 = None
         if "advisor_id" in df.columns:
             review_counts = df.groupby("advisor_id").size()
             reviews_per_advisor_min = int(review_counts.min())
             reviews_per_advisor_max = int(review_counts.max())
-        else:
-            reviews_per_advisor_min = None
-            reviews_per_advisor_max = None
+            rpa_q1 = int(review_counts.quantile(0.25))
+            rpa_q3 = int(review_counts.quantile(0.75))
+
         return {
             "date_min": date_min.isoformat() if pd.notna(date_min) else None,
             "date_max": date_max.isoformat() if pd.notna(date_max) else None,
             "row_count": int(df.shape[0]),
             "token_min": int(token_min) if pd.notna(token_min) else None,
             "token_max": int(token_max) if pd.notna(token_max) else None,
+            "token_q1": token_q1,
+            "token_q3": token_q3,
             "rating_min": float(rating_min) if pd.notna(rating_min) else None,
             "rating_max": float(rating_max) if pd.notna(rating_max) else None,
             "reviews_per_advisor_min": reviews_per_advisor_min,
             "reviews_per_advisor_max": reviews_per_advisor_max,
+            "rpa_q1": rpa_q1,
+            "rpa_q3": rpa_q3,
         }
 
     def _eda_summary(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:

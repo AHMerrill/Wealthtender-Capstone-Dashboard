@@ -103,7 +103,6 @@ app.layout = html.Div(
         dcc.Location(id="url"),
         dcc.Store(id="user-role", storage_type="session"),
         dcc.Store(id="firm-options-loaded", data=False),
-        dcc.Store(id="eda-sliders-initialized", data=False),
         dcc.Interval(id="api-poll", interval=3_000, max_intervals=40),
 
         # -- Top nav bar --
@@ -190,11 +189,12 @@ app.layout = html.Div(
                                     + [{"label": str(i), "value": float(i)}
                                        for i in range(1, 6)],
                                     value="all", clearable=False)),
-                                _filter("Reviews per Advisor", dcc.RangeSlider(
+                                _filter("Reviews per Advisor", dcc.RadioItems(
                                     id="eda-review-range",
-                                    min=0, max=50, step=1, value=[0, 50],  # updated by API
-                                    tooltip={"placement": "bottom",
-                                             "always_visible": False})),
+                                    options=[{"label": "All", "value": "all"}],
+                                    value="all",
+                                    className="filter-btn-group",
+                                    inline=True)),
                                 _filter("Date Range", dcc.DatePickerRange(
                                     id="eda-date-range",
                                     start_date=None, end_date=None,
@@ -202,11 +202,12 @@ app.layout = html.Div(
                                     start_date_placeholder_text="Start",
                                     end_date_placeholder_text="End",
                                     style={"width": "100%"})),
-                                _filter("Token Count", dcc.RangeSlider(
+                                _filter("Token Count", dcc.RadioItems(
                                     id="eda-token-range",
-                                    min=0, max=1000, step=10, value=[0, 1000],
-                                    tooltip={"placement": "bottom",
-                                             "always_visible": False})),
+                                    options=[{"label": "All", "value": "all"}],
+                                    value="all",
+                                    className="filter-btn-group",
+                                    inline=True)),
                                 _filter("N-gram Size", dcc.Dropdown(
                                     id="eda-ngram-size",
                                     options=[{"label": f"{i}-gram", "value": i}

@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, callback, Input, Output, State, no_update
+from dash import html, dcc, callback, Input, Output, no_update
 import plotly.graph_objects as go
 
 from dashboard.services.api import get_eda_charts, get_review_detail
@@ -102,15 +102,8 @@ def eda_content():
     Output("eda-top-ngrams", "figure"),
     Output("eda-date-range", "start_date"),
     Output("eda-date-range", "end_date"),
-    Output("eda-token-range", "min"),
-    Output("eda-token-range", "max"),
-    Output("eda-token-range", "value"),
-    Output("eda-token-range", "marks"),
-    Output("eda-review-range", "min"),
-    Output("eda-review-range", "max"),
-    Output("eda-review-range", "value"),
-    Output("eda-review-range", "marks"),
-    Output("eda-sliders-initialized", "data"),
+    Output("eda-token-range", "options"),
+    Output("eda-review-range", "options"),
     Input("eda-scope", "value"),
     Input("firm-dropdown", "value"),
     Input("eda-date-range", "start_date"),
@@ -123,60 +116,87 @@ def eda_content():
     Input("eda-exclude-stopwords", "value"),
     Input("eda-custom-stopwords", "value"),
     Input("url", "pathname"),
-    State("eda-sliders-initialized", "data"),
     prevent_initial_call=True,
 )
 def update_eda_charts(
     scope, firm_id, start_date, end_date, rating_value,
-    token_range, review_range, ngram_size, ngram_topn,
+    token_cat, review_cat, ngram_size, ngram_topn,
     exclude_stopwords, custom_stopwords, pathname,
-    sliders_initialized,
 ):
     # Don't run when EDA page isn't loaded (outputs don't exist yet)
     if pathname != "/eda":
         raise dash.exceptions.PreventUpdate
 
-    # If scope or firm changed, reset the slider init flag so we re-snap
-    # to the new data range rather than sending stale slider values.
-    triggered = {t["prop_id"].split(".")[0] for t in dash.callback_context.triggered}
-    if {"eda-scope", "firm-dropdown"} & triggered:
-        sliders_initialized = False
-
     palette = get_dataviz_palette()
 
-    # -- Build API query params --
-    params = {"scope": scope}
+    # -- First, fetch unfiltered data to get quartile breakpoints --
+    base_params = {"scope": scope}
     if scope == "firm" and firm_id:
-        params["firm_id"] = firm_id
+        base_params["firm_id"] = firm_id
+
+    # -- Build API query params --
+    params = dict(base_params)
     if start_date:
         params["date_start"] = start_date
     if end_date:
         params["date_end"] = end_date
     if rating_value and rating_value != "all":
         params["rating"] = rating_value
-    # Only send slider values as filters AFTER the first successful load.
-    # On the first fire the sliders still hold layout placeholders (e.g.
-    # [0, 50] for reviews, [0, 1000] for tokens).  Sending those would
-    # incorrectly constrain the data.  After the first load we replace
-    # them with the real data range and set sliders_initialized = True.
-    if sliders_initialized:
-        if token_range and len(token_range) == 2:
-            params["min_tokens"] = token_range[0]
-            params["max_tokens"] = token_range[1]
-        if review_range and len(review_range) == 2:
-            params["min_reviews_per_advisor"] = review_range[0]
-            params["max_reviews_per_advisor"] = review_range[1]
+
+    # Map category selections to numeric ranges.
+    # We need the meta from a base (unfiltered) call to know the quartiles,
+    # but we can use the meta from any call since the base_params are scope-
+    # level.  We'll apply category filters after we get meta back.
+    # For now, skip token/review filters — we'll add them below after
+    # a first call to get quartile info.
+
     if ngram_size:
         params["lexical_n"] = ngram_size
     if ngram_topn:
         params["lexical_top_n"] = ngram_topn
     params["exclude_stopwords"] = bool(exclude_stopwords)
-    # Only send custom_stopwords when user has explicitly picked specific words.
-    # Empty list = use full NLTK defaults (handled server-side).
     if exclude_stopwords and custom_stopwords:
         params["custom_stopwords"] = custom_stopwords
-    # (when exclude is on but custom_stopwords is empty/None, the API uses
-    #  the full NLTK set -- no custom_stopwords param needed)
+
+    # If user selected a category other than "all", we need quartile info
+    # first.  Do a quick base call to get meta, then re-call with filters.
+    needs_filter = (token_cat and token_cat != "all") or (review_cat and review_cat != "all")
+
+    if needs_filter:
+        # Get base meta with quartiles (no token/review filters)
+        base_payload = get_eda_charts(base_params)
+        base_meta = (base_payload or {}).get("meta", {})
+
+        # Map categories to numeric ranges using quartiles
+        if token_cat and token_cat != "all":
+            t_min = base_meta.get("token_min", 0) or 0
+            t_max = base_meta.get("token_max", 10000) or 10000
+            t_q1 = base_meta.get("token_q1", t_min)
+            t_q3 = base_meta.get("token_q3", t_max)
+            if token_cat == "low":
+                params["min_tokens"] = t_min
+                params["max_tokens"] = t_q1
+            elif token_cat == "medium":
+                params["min_tokens"] = t_q1 + 1
+                params["max_tokens"] = t_q3
+            elif token_cat == "high":
+                params["min_tokens"] = t_q3 + 1
+                params["max_tokens"] = t_max
+
+        if review_cat and review_cat != "all":
+            r_min = base_meta.get("reviews_per_advisor_min", 0) or 0
+            r_max = base_meta.get("reviews_per_advisor_max", 1000) or 1000
+            r_q1 = base_meta.get("rpa_q1", r_min)
+            r_q3 = base_meta.get("rpa_q3", r_max)
+            if review_cat == "low":
+                params["min_reviews_per_advisor"] = r_min
+                params["max_reviews_per_advisor"] = r_q1
+            elif review_cat == "medium":
+                params["min_reviews_per_advisor"] = r_q1 + 1
+                params["max_reviews_per_advisor"] = r_q3
+            elif review_cat == "high":
+                params["min_reviews_per_advisor"] = r_q3 + 1
+                params["max_reviews_per_advisor"] = r_max
 
     payload = get_eda_charts(params)
 
@@ -192,8 +212,7 @@ def update_eda_charts(
              _kpi("Rating missing", "..."), _kpi("Text empty", "...")],
             empty_fig, empty_fig, empty_fig,
             empty_fig, empty_fig, empty_fig,
-            *(no_update,) * 10,
-            no_update,  # sliders_initialized stays as-is
+            *(no_update,) * 4,  # date range + button options
         )
 
     # -- Unpack payload --
@@ -235,27 +254,27 @@ def update_eda_charts(
         payload.get("lexical", {}).get("top_ngrams", []), "ngram", palette,
     )
 
-    # -- Slider / date-picker meta updates --
-    token_min = meta.get("token_min", 0) or 0
-    token_max = meta.get("token_max", 1000) or 1000
-    # Always snap to full data range — user adjustments trigger a new call
-    # which returns filtered meta, so the sliders stay consistent.
-    token_value = [token_min, token_max]
-
+    # -- Date picker --
     start_value = start_date if start_date else meta.get("date_min")
     end_value = end_date if end_date else meta.get("date_max")
 
-    review_min = meta.get("reviews_per_advisor_min", 0) or 0
-    review_max = meta.get("reviews_per_advisor_max", 50) or 50
-    review_value = [review_min, review_max]
+    # -- Build dynamic button labels from quartile meta --
+    # Use base_meta if we fetched it, otherwise use the payload's meta
+    q_meta = base_meta if needs_filter else meta
+    token_opts = _category_options(
+        q_meta.get("token_min"), q_meta.get("token_max"),
+        q_meta.get("token_q1"), q_meta.get("token_q3"),
+    )
+    review_opts = _category_options(
+        q_meta.get("reviews_per_advisor_min"), q_meta.get("reviews_per_advisor_max"),
+        q_meta.get("rpa_q1"), q_meta.get("rpa_q3"),
+    )
 
     return (
         summary_cards, coverage_cards, quality_cards,
         rating_fig, time_fig, reviews_fig, token_fig, scatter_fig, ngrams_fig,
         start_value, end_value,
-        token_min, token_max, token_value, _range_marks(token_min, token_max),
-        review_min, review_max, review_value, _range_marks(review_min, review_max),
-        True,  # mark sliders as initialized so future fires send filters
+        token_opts, review_opts,
     )
 
 
@@ -351,9 +370,12 @@ def _review_card(detail: dict):
     return html.Div(children=children)
 
 
-def _range_marks(mn, mx):
-    if mn is None or mx is None:
-        return {}
-    if mn == mx:
-        return {mn: str(mn)}
-    return {mn: str(mn), mx: str(mx)}
+def _category_options(data_min, data_max, q1, q3):
+    """Build radio button options with dynamic quartile labels."""
+    opts = [{"label": "All", "value": "all"}]
+    if data_min is None or data_max is None or q1 is None or q3 is None:
+        return opts
+    opts.append({"label": f"Low ({data_min}–{q1})", "value": "low"})
+    opts.append({"label": f"Med ({q1 + 1}–{q3})", "value": "medium"})
+    opts.append({"label": f"High ({q3 + 1}–{data_max})", "value": "high"})
+    return opts
