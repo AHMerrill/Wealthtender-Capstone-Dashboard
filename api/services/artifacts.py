@@ -13,20 +13,49 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_METADATA = ROOT / "artifacts" / "metadata.json"
 
-STOPWORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but",
-    "by", "can", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for",
-    "from", "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself",
-    "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "just",
-    "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on", "once",
-    "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she",
-    "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves",
-    "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until",
-    "up", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom",
-    "why", "with", "you", "your", "yours", "yourself", "yourselves",
-    "amp", "nbsp",
+# NLTK english stopwords (nltk.corpus.stopwords.words("english")) -- vendored
+# to avoid adding NLTK as a dependency.  This is the exact frozen set from
+# NLTK 3.8.1 so the dashboard matches standard NLP practice.
+STOPWORDS: set[str] = {
+    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you",
+    "you're", "you've", "you'll", "you'd", "your", "yours", "yourself",
+    "yourselves", "he", "him", "his", "himself", "she", "she's", "her",
+    "hers", "herself", "it", "it's", "its", "itself", "they", "them",
+    "their", "theirs", "themselves", "what", "which", "who", "whom", "this",
+    "that", "that'll", "these", "those", "am", "is", "are", "was", "were",
+    "be", "been", "being", "have", "has", "had", "having", "do", "does",
+    "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because",
+    "as", "until", "while", "of", "at", "by", "for", "with", "about",
+    "against", "between", "through", "during", "before", "after", "above",
+    "below", "to", "from", "up", "down", "in", "out", "on", "off", "over",
+    "under", "again", "further", "then", "once", "here", "there", "when",
+    "where", "why", "how", "all", "both", "each", "few", "more", "most",
+    "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+    "so", "than", "too", "very", "s", "t", "can", "will", "just", "don",
+    "don't", "should", "should've", "now", "d", "ll", "m", "o", "re",
+    "ve", "y", "ain", "aren", "aren't", "couldn", "couldn't", "didn",
+    "didn't", "doesn", "doesn't", "hadn", "hadn't", "hasn", "hasn't",
+    "haven", "haven't", "isn", "isn't", "ma", "mightn", "mightn't",
+    "mustn", "mustn't", "needn", "needn't", "shan", "shan't", "shouldn",
+    "shouldn't", "wasn", "wasn't", "weren", "weren't", "won", "won't",
+    "wouldn", "wouldn't",
+    "nbsp", "amp",
 }
+
+# Sorted list for the frontend dropdown (exported via /api/stopwords)
+STOPWORDS_SORTED: list[str] = sorted(STOPWORDS)
+
+
+def _tokenize_simple(s: str) -> list[str]:
+    """Tokenizer matching the notebook's tokenize_simple exactly.
+
+    Lowercases, strips non-alphanumeric (keeping apostrophes), collapses
+    whitespace, and drops single-character tokens.
+    """
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9\s']", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return [w for w in s.split() if len(w) > 1]
 
 
 # --------------------------------------------------------------------------------------
@@ -39,7 +68,7 @@ class ArtifactStore:
 
     This class intentionally supports two valid operating modes:
       1) Firm-scoped datasets (scores contain firm_id)
-      2) Global-only datasets (macro insights without firms)
+      2) Global-only datasets (EDA without firms)
 
     All public methods degrade gracefully when a capability is unavailable.
     """
@@ -53,7 +82,7 @@ class ArtifactStore:
         self.benchmarks = self._load_table("benchmarks")
         self.themes = self._load_table("themes")
 
-        # Macro artifacts
+        # EDA artifacts (property names match metadata.json manifest keys)
         self.macro_reviews_clean = self._load_table("macro_reviews_clean")
         self.macro_eda_summary = self._load_json("macro_eda_summary")
         self.macro_coverage = self._load_json("macro_coverage")
@@ -70,7 +99,7 @@ class ArtifactStore:
             and "advisor_id" in self.scores.columns
         )
 
-        self._prepare_macro_reviews()
+        self._prepare_reviews()
 
     # ----------------------------------------------------------------------------------
     # Loading helpers
@@ -127,7 +156,7 @@ class ArtifactStore:
     # Preparation
     # ----------------------------------------------------------------------------------
 
-    def _prepare_macro_reviews(self) -> None:
+    def _prepare_reviews(self) -> None:
         if self.macro_reviews_clean.empty:
             return
 
@@ -155,7 +184,6 @@ class ArtifactStore:
     def list_firms(self) -> List[Dict]:
         if not self.has_firms:
             return []
-
         firms = (
             self.scores[["firm_id"]]
             .drop_duplicates()
@@ -166,11 +194,9 @@ class ArtifactStore:
     def firm_summary(self, firm_id: str) -> Optional[Dict]:
         if not self.has_firms:
             return None
-
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
-
         return {
             "firm_id": firm_id,
             "advisor_count": int(df["advisor_id"].nunique()),
@@ -182,11 +208,9 @@ class ArtifactStore:
     def firm_dimensions(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms:
             return None
-
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty or "dimension" not in df.columns:
             return None
-
         summary = (
             df.groupby("dimension")[["score", "confidence", "review_count"]]
             .mean(numeric_only=True)
@@ -198,11 +222,9 @@ class ArtifactStore:
     def firm_advisors(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms:
             return None
-
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
-
         summary = (
             df.groupby("advisor_id")[["score", "confidence", "review_count"]]
             .mean(numeric_only=True)
@@ -213,19 +235,17 @@ class ArtifactStore:
     def advisor_detail(self, firm_id: str, advisor_id: str) -> Optional[Dict]:
         if not self.has_firms:
             return None
-
         df = self.scores[
             (self.scores["firm_id"] == firm_id)
             & (self.scores["advisor_id"] == advisor_id)
         ]
         if df.empty:
             return None
-
         themes = (
-            self.themes[self.themes.get("advisor_id") == advisor_id]
-            if not self.themes.empty else pd.DataFrame()
+            self.themes[self.themes["advisor_id"] == advisor_id]
+            if not self.themes.empty and "advisor_id" in self.themes.columns
+            else pd.DataFrame()
         )
-
         return {
             "advisor_id": advisor_id,
             "firm_id": firm_id,
@@ -277,11 +297,9 @@ class ArtifactStore:
     def firm_personas(self, firm_id: str) -> Optional[List[Dict]]:
         if not self.has_firms:
             return None
-
         df = self.scores[self.scores["firm_id"] == firm_id]
         if df.empty:
             return None
-
         personas = (
             df.groupby("advisor_id")["score"]
             .mean()
@@ -291,7 +309,7 @@ class ArtifactStore:
         return personas.to_dict(orient="records")
 
     # ----------------------------------------------------------------------------------
-    # EDA (macro insights)
+    # EDA
     # ----------------------------------------------------------------------------------
 
     def eda_payload(self, **kwargs) -> Dict[str, Any]:
@@ -300,7 +318,7 @@ class ArtifactStore:
 
         preset = kwargs.get("preset")
         if preset == "eda":
-            return self._macro_payload_from_df(
+            return self._eda_payload_from_df(
                 self.macro_reviews_clean.copy(),
                 kwargs.get("lexical_top_n", 20),
                 preset="eda",
@@ -310,18 +328,19 @@ class ArtifactStore:
             "scope": kwargs.get("scope"),
             "firm_id": kwargs.get("firm_id"),
         }
-        base_df = self._apply_macro_filters(**base_kwargs)
-        filtered_df = self._apply_macro_filters(**kwargs)
-        payload = self._macro_payload_from_df(
+        base_df = self._apply_eda_filters(**base_kwargs)
+        filtered_df = self._apply_eda_filters(**kwargs)
+        payload = self._eda_payload_from_df(
             filtered_df,
             kwargs.get("lexical_top_n", 20),
             lexical_n=kwargs.get("lexical_n", 1),
             exclude_stopwords=kwargs.get("exclude_stopwords", False),
+            custom_stopwords=kwargs.get("custom_stopwords"),
         )
-        payload["meta"] = self._macro_meta(base_df)
+        payload["meta"] = self._eda_meta(base_df)
         return payload
 
-    def _apply_macro_filters(self, **kwargs) -> pd.DataFrame:
+    def _apply_eda_filters(self, **kwargs) -> pd.DataFrame:
         df = self.macro_reviews_clean.copy()
 
         if kwargs.get("scope") == "firm" and self.has_firms:
@@ -344,31 +363,43 @@ class ArtifactStore:
         if kwargs.get("max_tokens") is not None and "token_count" in df.columns:
             df = df[df["token_count"] <= kwargs["max_tokens"]]
 
+        # Reviews-per-advisor filter
+        min_rpa = kwargs.get("min_reviews_per_advisor")
+        max_rpa = kwargs.get("max_reviews_per_advisor")
+        if (min_rpa is not None or max_rpa is not None) and "advisor_id" in df.columns:
+            counts = df.groupby("advisor_id").size()
+            if min_rpa is not None:
+                counts = counts[counts >= min_rpa]
+            if max_rpa is not None:
+                counts = counts[counts <= max_rpa]
+            df = df[df["advisor_id"].isin(counts.index)]
+
         return df
 
     # ----------------------------------------------------------------------------------
-    # Macro helpers
+    # EDA helpers
     # ----------------------------------------------------------------------------------
 
-    def _macro_payload_from_df(self, df: pd.DataFrame, lexical_top_n: int,
-                               preset: Optional[str] = None,
-                               lexical_n: int = 1,
-                               exclude_stopwords: bool = False) -> Dict[str, Any]:
-
+    def _eda_payload_from_df(self, df: pd.DataFrame, lexical_top_n: int,
+                             preset: Optional[str] = None,
+                             lexical_n: int = 1,
+                             exclude_stopwords: bool = False,
+                             custom_stopwords: Optional[List[str]] = None) -> Dict[str, Any]:
         return {
-            "summary": self._macro_summary(df, preset),
-            "quality": self._macro_quality(df, preset),
-            "coverage": self._macro_coverage(df, preset),
-            "rating_distribution": self._macro_rating_distribution(df),
-            "reviews_over_time": self._macro_reviews_over_time(df),
-            "reviews_per_advisor": self._macro_reviews_per_advisor(df),
-            "token_counts": self._macro_token_counts(df),
-            "rating_vs_token": self._macro_rating_vs_token(df),
-            "lexical": self._macro_lexical(df, lexical_top_n, preset, lexical_n, exclude_stopwords),
-            "meta": self._macro_meta(df),
+            "summary": self._eda_summary(df, preset),
+            "quality": self._eda_quality(df, preset),
+            "coverage": self._eda_coverage(df, preset),
+            "rating_distribution": self._eda_rating_distribution(df),
+            "reviews_over_time": self._eda_reviews_over_time(df),
+            "reviews_per_advisor": self._eda_reviews_per_advisor(df),
+            "token_counts": self._eda_token_counts(df),
+            "rating_vs_token": self._eda_rating_vs_token(df),
+            "lexical": self._eda_lexical(df, lexical_top_n, preset, lexical_n,
+                                         exclude_stopwords, custom_stopwords),
+            "meta": self._eda_meta(df),
         }
 
-    def _macro_meta(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _eda_meta(self, df: pd.DataFrame) -> Dict[str, Any]:
         if df.empty or "review_date" not in df.columns:
             return {}
         date_min = df["review_date"].min()
@@ -396,7 +427,7 @@ class ArtifactStore:
             "reviews_per_advisor_max": reviews_per_advisor_max,
         }
 
-    def _macro_summary(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
+    def _eda_summary(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
         if preset == "eda" and self.macro_eda_summary:
             return self.macro_eda_summary
         if df.empty:
@@ -406,8 +437,7 @@ class ArtifactStore:
             "reviews": int(df.shape[0]),
             "advisors": int(df["advisor_id"].nunique()) if "advisor_id" in df.columns else 0,
             "rating_counts": {str(k): int(v) for k, v in rating_counts.items()}
-            if hasattr(rating_counts, "items")
-            else {},
+            if hasattr(rating_counts, "items") else {},
             "rev_per_adv_summary": self._review_count_summary(df),
             "token_count_summary": self._token_count_summary(df),
             "pct_under_20_tokens": self._pct_under_tokens(df, 20),
@@ -430,7 +460,7 @@ class ArtifactStore:
             return 0.0
         return float((df["token_count"] < threshold).mean())
 
-    def _macro_quality(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
+    def _eda_quality(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
         if preset == "eda" and self.macro_quality_summary:
             return self.macro_quality_summary
         if df.empty:
@@ -450,7 +480,7 @@ class ArtifactStore:
             "text_empty_frac": text_empty_frac,
         }
 
-    def _macro_coverage(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
+    def _eda_coverage(self, df: pd.DataFrame, preset: Optional[str]) -> Dict[str, Any]:
         if preset == "eda" and self.macro_coverage:
             return self.macro_coverage
         if df.empty or "advisor_id" not in df.columns:
@@ -465,7 +495,7 @@ class ArtifactStore:
             "p90_reviews_per_advisor": float(counts.quantile(0.9)),
         }
 
-    def _macro_rating_distribution(self, df: pd.DataFrame) -> List[Dict]:
+    def _eda_rating_distribution(self, df: pd.DataFrame) -> List[Dict]:
         if df.empty or "rating" not in df.columns:
             return []
         return [
@@ -473,23 +503,23 @@ class ArtifactStore:
             for k, v in df["rating"].value_counts(dropna=False).items()
         ]
 
-    def _macro_reviews_over_time(self, df: pd.DataFrame) -> List[Dict]:
+    def _eda_reviews_over_time(self, df: pd.DataFrame) -> List[Dict]:
         if df.empty or "review_date" not in df.columns:
             return []
-        series = df.dropna(subset=["review_date"]).set_index("review_date").resample("M").size()
+        series = df.dropna(subset=["review_date"]).set_index("review_date").resample("ME").size()
         return [{"period": idx.strftime("%Y-%m"), "count": int(val)} for idx, val in series.items()]
 
-    def _macro_reviews_per_advisor(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _eda_reviews_per_advisor(self, df: pd.DataFrame) -> Dict[str, Any]:
         if df.empty or "advisor_id" not in df.columns:
             return {"counts": []}
         return {"counts": df.groupby("advisor_id").size().tolist()}
 
-    def _macro_token_counts(self, df: pd.DataFrame) -> List[int]:
+    def _eda_token_counts(self, df: pd.DataFrame) -> List[int]:
         if df.empty or "token_count" not in df.columns:
             return []
         return df["token_count"].dropna().astype(int).tolist()
 
-    def _macro_rating_vs_token(self, df: pd.DataFrame) -> List[Dict]:
+    def _eda_rating_vs_token(self, df: pd.DataFrame) -> List[Dict]:
         if df.empty or "rating" not in df.columns or "token_count" not in df.columns:
             return []
         subset = df.dropna(subset=["rating", "token_count"])
@@ -500,9 +530,10 @@ class ArtifactStore:
                 record["review_id"] = review_id
         return records
 
-    def _macro_lexical(self, df: pd.DataFrame, top_n: int,
-                       preset: Optional[str], lexical_n: int,
-                       exclude_stopwords: bool) -> Dict[str, Any]:
+    def _eda_lexical(self, df: pd.DataFrame, top_n: int,
+                     preset: Optional[str], lexical_n: int,
+                     exclude_stopwords: bool,
+                     custom_stopwords: Optional[List[str]] = None) -> Dict[str, Any]:
 
         if preset == "eda":
             return {"top_ngrams": self.macro_top_tokens.to_dict(orient="records")}
@@ -510,12 +541,21 @@ class ArtifactStore:
         if df.empty or "review_text_clean" not in df.columns:
             return {"top_ngrams": []}
 
-        counter = Counter()
+        # Build the active stopword set
+        stop_set: set[str] = set()
+        if exclude_stopwords:
+            if custom_stopwords:
+                # User picked specific words to exclude
+                stop_set = {w.lower().strip() for w in custom_stopwords if w}
+            else:
+                # No custom list (None or empty) = use full NLTK defaults
+                stop_set = STOPWORDS
+
+        counter: Counter = Counter()
         for text in df["review_text_clean"].dropna().astype(str):
-            cleaned = re.sub(r"&[a-z]+;", " ", text.lower())
-            parts = re.findall(r"[a-z0-9']+", cleaned)
-            if exclude_stopwords:
-                parts = [p for p in parts if p not in STOPWORDS]
+            parts = _tokenize_simple(text)
+            if stop_set:
+                parts = [p for p in parts if p not in stop_set]
             if lexical_n == 1:
                 counter.update(parts)
             else:

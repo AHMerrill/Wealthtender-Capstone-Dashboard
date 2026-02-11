@@ -99,11 +99,11 @@ but will use your default `python3` if not.
 
 - Auth is stubbed. The dashboard currently uses a firm selector to simulate firm scoping.
 - Artifacts are loaded via the API. The dashboard does not read files directly.
-- EDA charts are built from `artifacts/macro_insights/**` (moved from the EDA outputs).
+- EDA charts are built from the artifacts in `artifacts/macro_insights/` (legacy directory name from the original EDA pipeline).
 
 ## EDA Data
 
-The EDA view is generated from these artifact files:
+The EDA view is generated from these artifact files (directory is `macro_insights` for historical reasons; the codebase refers to this feature as "EDA" everywhere else):
 
 - `artifacts/macro_insights/reviews_clean.csv`
 - `artifacts/macro_insights/eda/eda_summary.json`
@@ -116,31 +116,67 @@ The EDA view is generated from these artifact files:
 
 If you replace these artifacts with new exports from the EDA notebook, the dashboard will reflect the new outputs.
 
-## Deployment + Auth Handoff
+## Running Locally
 
-This repo is designed for a standard production setup:
+### Quick start (no Docker)
 
-1. Deploy the API and Dash app on a server or container.
-2. Put authentication in front of the app (reverse proxy or API-layer auth).
-3. Expose a URL like `dashboard.clientsite.com`, or embed via iframe.
-
-### Render (Docker) notes
-
-If you deploy the API and dashboard as separate Render services using
-`Dockerfile.api` and `Dockerfile.dashboard`, set this environment variable
-on the **dashboard** service:
-
-```
-API_BASE=https://<your-api-service>.onrender.com
+```bash
+bash run.sh
 ```
 
-The dashboard uses `API_BASE` to reach the API in hosted environments.
-Locally it defaults to `http://localhost:8000`.
+This creates a virtualenv, installs deps, starts the API on port 8000, and
+launches the Dash app on port 8050.
 
-Common auth options:
-- Username/password via reverse proxy (e.g., Nginx + basic auth or OAuth/SSO).
-- Firm-scoped JWTs enforced by the API.
-- SSO integration handled at the hosting layer.
+### With Docker Compose
 
-The dashboard already assumes firm scoping. In production, the selected firm should
-come from the authenticated user context rather than a dropdown.
+```bash
+docker compose up --build     # first time or after code changes
+docker compose up              # subsequent runs
+```
+
+- Dashboard: http://localhost:8050
+- API: http://localhost:8000
+
+The compose file wires `API_BASE` automatically so the dashboard finds the API.
+
+### Environment variables
+
+See `.env.example` for all available settings. For local dev the defaults
+work out of the box. Copy it to `.env` if you need to customize.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_BASE` | `http://localhost:8000` | URL the dashboard uses to reach the API |
+| `PORT` | `8050` (dashboard) / `8000` (API) | Listening port for each service |
+
+## Deployment
+
+### Render (recommended)
+
+The repo includes `render.yaml` which defines both services. To deploy:
+
+1. Push this repo to GitHub.
+2. In Render, click **New > Blueprint** and connect the repo.
+3. Render reads `render.yaml` and creates both services automatically.
+4. After the first deploy, update the dashboard's `API_BASE` env var to
+   match the actual API service URL (e.g. `https://wealthtender-api.onrender.com`).
+
+### Other platforms
+
+Both Dockerfiles are standard and work on any container host (Railway, Fly.io,
+AWS ECS, GCP Cloud Run, etc.). Just set `API_BASE` on the dashboard service
+to point at the API.
+
+## Auth Handoff
+
+The dashboard already supports firm-scoped data. In production, the selected
+firm should come from the authenticated user context rather than a UI dropdown.
+
+Common integration options:
+- **Reverse proxy auth** (Nginx + basic auth, OAuth2 Proxy, or SSO)
+- **Firm-scoped JWTs** enforced by the API middleware
+- **SSO** handled at the hosting layer (Render, Cloudflare Access, etc.)
+
+The splash page currently uses a role selector for demo purposes. In production,
+replace this with your auth provider and inject the user's role and firm_id
+from the session.

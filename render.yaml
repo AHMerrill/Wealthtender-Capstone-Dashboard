@@ -1,0 +1,24 @@
+services:
+  # ---- FastAPI backend ----
+  - type: web
+    name: wealthtender-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "10000"
+
+  # ---- Dash frontend ----
+  - type: web
+    name: wealthtender-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile.dashboard
+    plan: free
+    envVars:
+      - key: PORT
+        value: "8050"
+      - key: API_BASE
+        # Replace with your actual API service URL after first deploy
+        value: "https://wealthtender-api.onrender.com"

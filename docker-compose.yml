@@ -1,0 +1,37 @@
+# docker-compose.yml — local development
+#
+# Usage:
+#   docker compose up --build       # first time / after code changes
+#   docker compose up               # subsequent runs
+#   docker compose down             # stop everything
+#
+# The dashboard will be at http://localhost:8050
+# The API will be at     http://localhost:8000
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "8050:8050"
+    environment:
+      PORT: "8050"
+      API_BASE: "http://api:8000"
+    depends_on:
+      api:
+        condition: service_healthy

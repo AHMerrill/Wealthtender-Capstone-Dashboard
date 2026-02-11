@@ -5,7 +5,9 @@ ROOT = Path(__file__).resolve().parents[1]
 FONT_FAMILY = '"Open Sans", Arial, sans-serif'
 
 COLORS = {
-    "blue": "#1c417d",
+    "blue": "#004C8C",
+    "blue_light": "#529BD9",
+    "navy": "#043466",
     "ink": "#111827",
     "gray": "#6b7280",
     "soft_blue": "#e3f5fe",
@@ -14,17 +16,20 @@ COLORS = {
     "bg": "#f8fbff",
 }
 
+# Brand-anchored palette: WT blues as the backbone, complemented by
+# raspberry, burgundy, golds, and purples.  No oranges, yellows, or
+# bright reds -- those felt like departures from the brand tone.
 DATA_VIZ_PALETTE = [
-    "#111827",
-    "#1c417d",
-    "#6b7280",
-    "#ffffff",
-    "#e3f5fe",
-    "#790000",
-    "#5757dd",
-    "#5a8fd0",
-    "#1da1f2",
-    "#000000",
+    "#004C8C",   # WT brand navy          -- primary
+    "#D4376E",   # raspberry              -- warm pop
+    "#529BD9",   # WT sky blue            -- secondary
+    "#7C3AED",   # deep violet            -- modern punch
+    "#043466",   # WT deep navy           -- anchor
+    "#B8860B",   # dark goldenrod         -- rich warmth
+    "#6D2348",   # burgundy               -- depth
+    "#9F7AEA",   # soft lavender-purple   -- lighter accent
+    "#3A7BBF",   # mid blue               -- tonal bridge
+    "#C4975C",   # muted gold             -- earthy complement
 ]
 
 THEME_CSS = f"""@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
@@ -73,6 +78,8 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 
 .app-shell {{ min-height: 100vh; }}
 
+/* ------- Top navigation ------- */
+
 .top-nav {{
   display: flex;
   align-items: center;
@@ -99,20 +106,35 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   width: auto;
 }}
 
-.top-nav-links a {{
-  margin: 0;
-  color: var(--wt-ink);
-  font-weight: 600;
-}}
-
 .top-nav-links {{
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 4px;
   align-items: center;
   justify-content: flex-end;
   padding-right: 8px;
 }}
+
+.top-nav-links a {{
+  margin: 0;
+  padding: 6px 14px;
+  color: var(--wt-ink);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}}
+
+.top-nav-links a:hover {{
+  background: var(--wt-soft-blue);
+}}
+
+.top-nav-links a.active {{
+  background: var(--wt-blue);
+  color: #ffffff;
+}}
+
+/* ------- Layout shell ------- */
 
 .content-shell {{
   display: grid;
@@ -169,24 +191,6 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   gap: 6px;
 }}
 
-.filter-group {{
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}}
-
-.filter-group {{
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}}
-
-.filter-group {{
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}}
-
 .sidebar-section > *:not(:first-child) {{
   margin-top: 8px;
 }}
@@ -231,6 +235,8 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 
 .sidebar-note {{ color: var(--wt-gray); font-size: 13px; }}
 
+/* ------- Main content ------- */
+
 .page-container {{
   background: white;
   border: 1px solid #e5e7eb;
@@ -239,22 +245,32 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   min-height: 70vh;
 }}
 
+/* ------- KPI cards ------- */
+
 .kpi-grid {{
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 12px;
+  margin-bottom: 12px;
 }}
 
 .kpi-card {{
   background: var(--wt-soft-lavender);
   border-radius: 10px;
-  padding: 12px;
+  padding: 14px 16px;
+  transition: box-shadow 0.15s;
 }}
 
-.kpi-label {{ font-size: 12px; color: #374151; }}
-.kpi-value {{ font-size: 20px; font-weight: 700; color: var(--wt-blue); }}
+.kpi-card:hover {{
+  box-shadow: 0 2px 8px rgba(28, 65, 125, 0.10);
+}}
 
-.section {{ margin-top: 24px; }}
+.kpi-label {{ font-size: 12px; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }}
+.kpi-value {{ font-size: 22px; font-weight: 700; color: var(--wt-blue); margin-top: 4px; }}
+
+/* ------- Sections ------- */
+
+.section {{ margin-top: 28px; }}
 
 .section-header {{
   display: flex;
@@ -272,6 +288,8 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   color: var(--wt-ink);
   cursor: pointer;
 }}
+
+/* ------- Filters ------- */
 
 .filters-grid {{
   display: grid;
@@ -306,12 +324,14 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   color: var(--wt-gray);
 }}
 
+/* ------- Review detail ------- */
+
 .review-detail-card {{
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--wt-soft-lavender);
 }}
 
 .review-detail-title {{
@@ -330,6 +350,7 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   font-size: 14px;
   color: var(--wt-ink);
   margin-bottom: 8px;
+  line-height: 1.5;
 }}
 
 .review-detail-link {{
@@ -340,8 +361,10 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 .review-detail-empty {{
   font-size: 13px;
   color: var(--wt-gray);
+  font-style: italic;
 }}
 
+/* ------- Date picker overrides ------- */
 
 .DateRangePickerInput__withBorder {{
   width: 100%;
@@ -352,12 +375,16 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   padding: 0 4px;
 }}
 
+/* ------- Select / dropdown overrides ------- */
+
 .Select-control,
 .Select-placeholder,
 .Select-input,
 .Select-value-label {{
   font-size: 13px;
 }}
+
+/* ------- Charts ------- */
 
 .chart-card {{
   border: 1px solid #e5e7eb;
@@ -369,6 +396,183 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--wt-blue);
+}}
+
+/* ------- Loading / status banner ------- */
+
+.api-status-banner {{
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--wt-gray);
+  font-size: 14px;
+}}
+
+.api-status-banner .spinner {{
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--wt-soft-blue);
+  border-top-color: var(--wt-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}}
+
+@keyframes spin {{
+  to {{ transform: rotate(360deg); }}
+}}
+
+/* ------- Splash / home ------- */
+
+.splash-hero {{
+  text-align: center;
+  padding: 48px 24px 24px;
+}}
+
+.splash-hero h2 {{
+  font-size: 28px;
+  margin-bottom: 8px;
+}}
+
+.splash-subtitle {{
+  font-size: 16px;
+  color: var(--wt-gray);
+  margin-bottom: 12px;
+}}
+
+.splash-nav-grid {{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto 40px;
+}}
+
+/* Role selection cards on splash */
+.splash-role-card {{
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}}
+
+.splash-role-card:hover {{
+  border-color: var(--wt-blue);
+  box-shadow: 0 6px 20px rgba(0, 76, 140, 0.12);
+  transform: translateY(-2px);
+}}
+
+.splash-role-title {{
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--wt-blue);
+  margin-bottom: 6px;
+}}
+
+.splash-role-desc {{
+  font-size: 13px;
+  color: var(--wt-gray);
+  line-height: 1.5;
+}}
+
+.splash-enter-btn {{
+  background: var(--wt-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}}
+
+.splash-enter-btn:hover {{
+  background: #043466;
+}}
+
+.splash-enter-btn:disabled {{
+  background: #cbd5e1;
+  cursor: not-allowed;
+}}
+
+/* Legacy nav cards (kept for potential reuse) */
+.splash-nav-card {{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  background: var(--wt-soft-lavender);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--wt-ink);
+  font-weight: 600;
+  font-size: 14px;
+  transition: box-shadow 0.15s, transform 0.15s;
+}}
+
+.splash-nav-card:hover {{
+  box-shadow: 0 4px 12px rgba(28, 65, 125, 0.12);
+  transform: translateY(-2px);
+}}
+
+/* Sign out link in nav */
+.sign-out-link {{
+  color: var(--wt-gray) !important;
+  font-size: 12px;
+}}
+
+.splash-team {{
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}}
+
+.splash-team h3 {{
+  color: var(--wt-blue);
+  margin-top: 24px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}}
+
+.splash-team ul {{
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+}}
+
+.splash-team li {{
+  font-size: 14px;
+  color: var(--wt-ink);
+}}
+
+/* ------- Placeholder pages ------- */
+
+.placeholder-page {{
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--wt-gray);
+}}
+
+.placeholder-page h2 {{
+  color: var(--wt-ink);
+  margin-bottom: 8px;
+}}
+
+.placeholder-page p {{
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.6;
 }}
 """
 
