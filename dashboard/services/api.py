@@ -94,16 +94,22 @@ def is_api_ready() -> bool:
 
 
 def warm_api(
-    max_attempts: int = 12,
-    initial_delay: float = 5.0,
-    max_delay: float = 30.0,
-    boot_wait: float = 15.0,
+    max_attempts: int = 15,
+    initial_delay: float = 8.0,
+    max_delay: float = 45.0,
+    boot_wait: float = 30.0,
 ) -> None:
     """Hit the API health endpoint with exponential back-off.
 
     Render free-tier services spin down after inactivity.  When the dashboard
     container starts, the API container may still be cold.  This routine keeps
     retrying so the API is warm by the time the user's first callback fires.
+
+    IMPORTANT: This uses a plain requests.get() — NOT the shared _session —
+    because _session has urllib3 Retry configured with 429 in the
+    status_forcelist.  That causes retries-inside-retries during cold start,
+    which hammers the API and makes the 429 storm worse.  We control the
+    retry timing ourselves here with the backoff loop.
 
     Parameters
     ----------
@@ -122,9 +128,16 @@ def warm_api(
 
     url = f"{API_BASE}/api/health"
 
+    # Use a plain session with NO automatic retries for warm-up.
+    # This prevents urllib3 from retrying 429s internally and compounding
+    # the rate-limit problem during Render cold starts.
+    warm_session = requests.Session()
+    if API_KEY:
+        warm_session.headers["X-API-Key"] = API_KEY
+
     # --- Initial grace period ---
-    # On Render the API container typically needs 10-20s to boot.
-    # Waiting here avoids the first ~5 retries that always get 429'd.
+    # On Render the API container typically needs 20-40s to boot.
+    # Waiting here avoids the first several retries that always get 429'd.
     if boot_wait > 0:
         log.info("Waiting %.0fs for API container to boot before first health check...", boot_wait)
         time.sleep(boot_wait)
@@ -133,13 +146,12 @@ def warm_api(
 
     for attempt in range(1, max_attempts + 1):
         try:
-            resp = _session.get(url, timeout=15)
+            resp = warm_session.get(url, timeout=20)
             if resp.status_code == 200:
                 log.info("API is ready (attempt %d/%d)", attempt, max_attempts)
                 _api_ready = True
                 return
             if resp.status_code == 429:
-                # Rate-limited during cold start -- back off more aggressively
                 log.info(
                     "API rate-limited 429 (attempt %d/%d, backing off %.0fs)",
                     attempt, max_attempts, delay,
