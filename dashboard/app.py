@@ -189,12 +189,13 @@ app.layout = html.Div(
                                     + [{"label": str(i), "value": float(i)}
                                        for i in range(1, 6)],
                                     value="all", clearable=False)),
-                                _filter("Reviews per Advisor", dcc.RadioItems(
+                                _filter("Reviews per Advisor", dcc.Dropdown(
                                     id="eda-review-range",
                                     options=[{"label": "All", "value": "all"}],
-                                    value="all",
-                                    className="filter-btn-group",
-                                    inline=True)),
+                                    value=["all"],
+                                    multi=True,
+                                    clearable=False,
+                                    placeholder="Select range...")),
                                 _filter("Date Range", dcc.DatePickerRange(
                                     id="eda-date-range",
                                     start_date=None, end_date=None,
@@ -202,12 +203,13 @@ app.layout = html.Div(
                                     start_date_placeholder_text="Start",
                                     end_date_placeholder_text="End",
                                     style={"width": "100%"})),
-                                _filter("Token Count", dcc.RadioItems(
+                                _filter("Token Count", dcc.Dropdown(
                                     id="eda-token-range",
                                     options=[{"label": "All", "value": "all"}],
-                                    value="all",
-                                    className="filter-btn-group",
-                                    inline=True)),
+                                    value=["all"],
+                                    multi=True,
+                                    clearable=False,
+                                    placeholder="Select range...")),
                                 _filter("N-gram Size", dcc.Dropdown(
                                     id="eda-ngram-size",
                                     options=[{"label": f"{i}-gram", "value": i}

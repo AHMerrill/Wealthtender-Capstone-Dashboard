@@ -87,6 +87,43 @@ def eda_content():
 
 
 # ---------------------------------------------------------------------------
+# "All" toggle helpers — selecting "All" clears others, selecting a
+# category clears "All"
+# ---------------------------------------------------------------------------
+
+@callback(
+    Output("eda-token-range", "value"),
+    Input("eda-token-range", "value"),
+    prevent_initial_call=True,
+)
+def sync_token_all(selected):
+    if not selected:
+        return ["all"]
+    if "all" in selected and len(selected) > 1:
+        # User added "all" while categories were selected — keep only "all"
+        if selected[-1] == "all":
+            return ["all"]
+        # User added a category while "all" was selected — drop "all"
+        return [v for v in selected if v != "all"]
+    return selected
+
+
+@callback(
+    Output("eda-review-range", "value"),
+    Input("eda-review-range", "value"),
+    prevent_initial_call=True,
+)
+def sync_review_all(selected):
+    if not selected:
+        return ["all"]
+    if "all" in selected and len(selected) > 1:
+        if selected[-1] == "all":
+            return ["all"]
+        return [v for v in selected if v != "all"]
+    return selected
+
+
+# ---------------------------------------------------------------------------
 # Main EDA callback
 # ---------------------------------------------------------------------------
 
@@ -158,45 +195,42 @@ def update_eda_charts(
     if exclude_stopwords and custom_stopwords:
         params["custom_stopwords"] = custom_stopwords
 
-    # If user selected a category other than "all", we need quartile info
-    # first.  Do a quick base call to get meta, then re-call with filters.
-    needs_filter = (token_cat and token_cat != "all") or (review_cat and review_cat != "all")
+    # Normalize multi-select values: dropdown gives a list like ["all"],
+    # ["low", "medium"], etc.  Treat empty or ["all"] as no filter.
+    token_cats = set(token_cat or ["all"])
+    review_cats = set(review_cat or ["all"])
+    if "all" in token_cats:
+        token_cats = set()
+    if "all" in review_cats:
+        review_cats = set()
+
+    needs_filter = bool(token_cats) or bool(review_cats)
 
     if needs_filter:
         # Get base meta with quartiles (no token/review filters)
         base_payload = get_eda_charts(base_params)
         base_meta = (base_payload or {}).get("meta", {})
 
-        # Map categories to numeric ranges using quartiles
-        if token_cat and token_cat != "all":
+        # Map selected categories to a combined min/max range
+        if token_cats:
             t_min = base_meta.get("token_min", 0) or 0
             t_max = base_meta.get("token_max", 10000) or 10000
             t_q1 = base_meta.get("token_q1", t_min)
             t_q3 = base_meta.get("token_q3", t_max)
-            if token_cat == "low":
-                params["min_tokens"] = t_min
-                params["max_tokens"] = t_q1
-            elif token_cat == "medium":
-                params["min_tokens"] = t_q1 + 1
-                params["max_tokens"] = t_q3
-            elif token_cat == "high":
-                params["min_tokens"] = t_q3 + 1
-                params["max_tokens"] = t_max
+            combined_min, combined_max = _categories_to_range(
+                token_cats, t_min, t_max, t_q1, t_q3)
+            params["min_tokens"] = combined_min
+            params["max_tokens"] = combined_max
 
-        if review_cat and review_cat != "all":
+        if review_cats:
             r_min = base_meta.get("reviews_per_advisor_min", 0) or 0
             r_max = base_meta.get("reviews_per_advisor_max", 1000) or 1000
             r_q1 = base_meta.get("rpa_q1", r_min)
             r_q3 = base_meta.get("rpa_q3", r_max)
-            if review_cat == "low":
-                params["min_reviews_per_advisor"] = r_min
-                params["max_reviews_per_advisor"] = r_q1
-            elif review_cat == "medium":
-                params["min_reviews_per_advisor"] = r_q1 + 1
-                params["max_reviews_per_advisor"] = r_q3
-            elif review_cat == "high":
-                params["min_reviews_per_advisor"] = r_q3 + 1
-                params["max_reviews_per_advisor"] = r_max
+            combined_min, combined_max = _categories_to_range(
+                review_cats, r_min, r_max, r_q1, r_q3)
+            params["min_reviews_per_advisor"] = combined_min
+            params["max_reviews_per_advisor"] = combined_max
 
     payload = get_eda_charts(params)
 
@@ -371,7 +405,7 @@ def _review_card(detail: dict):
 
 
 def _category_options(data_min, data_max, q1, q3):
-    """Build radio button options with dynamic quartile labels."""
+    """Build dropdown options with dynamic quartile labels."""
     opts = [{"label": "All", "value": "all"}]
     if data_min is None or data_max is None or q1 is None or q3 is None:
         return opts
@@ -379,3 +413,27 @@ def _category_options(data_min, data_max, q1, q3):
     opts.append({"label": f"Med ({q1 + 1}–{q3})", "value": "medium"})
     opts.append({"label": f"High ({q3 + 1}–{data_max})", "value": "high"})
     return opts
+
+
+def _categories_to_range(cats: set, data_min: int, data_max: int,
+                         q1: int, q3: int) -> tuple:
+    """Map a set of category selections to a combined (min, max) range.
+
+    When multiple categories are selected (e.g. Low + Medium), the range
+    spans the lowest min to the highest max across those categories.
+    """
+    boundaries = {
+        "low": (data_min, q1),
+        "medium": (q1 + 1, q3),
+        "high": (q3 + 1, data_max),
+    }
+    mins = []
+    maxes = []
+    for cat in cats:
+        if cat in boundaries:
+            lo, hi = boundaries[cat]
+            mins.append(lo)
+            maxes.append(hi)
+    if not mins:
+        return data_min, data_max
+    return min(mins), max(maxes)
