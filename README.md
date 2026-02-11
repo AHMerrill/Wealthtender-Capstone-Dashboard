@@ -29,13 +29,21 @@ This is a private repo. Once you're added as a collaborator, you'll need an SSH 
 
 ### Step 1: Check for an existing SSH key
 
+**macOS / Linux:**
 ```bash
 ls ~/.ssh/id_ed25519.pub 2>/dev/null || ls ~/.ssh/id_rsa.pub 2>/dev/null
 ```
 
-If a file path prints, you already have a key — skip to Step 3.
+**Windows (PowerShell):**
+```powershell
+Test-Path "$HOME\.ssh\id_ed25519.pub"
+```
+
+If a file path prints (or `True` on Windows), you already have a key — skip to Step 3.
 
 ### Step 2: Generate a new SSH key
+
+This command works on all platforms (macOS, Linux, and Windows 10+):
 
 ```bash
 ssh-keygen -t ed25519 -C "your_email@example.com"
@@ -69,6 +77,8 @@ Get-Content "$HOME\.ssh\id_ed25519.pub" | Set-Clipboard
 4. Click **Add SSH key**
 
 ### Step 5: Test the connection
+
+Run this on any platform:
 
 ```bash
 ssh -T git@github.com
