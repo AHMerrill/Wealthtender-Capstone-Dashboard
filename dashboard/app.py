@@ -90,6 +90,7 @@ app.layout = html.Div(
         dcc.Location(id="url"),
         dcc.Store(id="user-role", storage_type="session"),
         dcc.Store(id="firm-options-loaded", data=False),
+        dcc.Store(id="eda-sliders-initialized", data=False),
         dcc.Interval(id="api-poll", interval=3_000, max_intervals=40),
 
         # -- Top nav bar --
@@ -609,6 +610,19 @@ def merge_stopwords(defaults_checked, extras_selected, exclude_checked):
         if w not in words:
             words.append(w)
     return words
+
+
+# ---------- Reset slider init on scope / firm change ----------
+
+@callback(
+    Output("eda-sliders-initialized", "data", allow_duplicate=True),
+    Input("eda-scope", "value"),
+    Input("firm-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def reset_slider_init(_scope, _firm):
+    """When scope or firm changes, force sliders to re-snap to full range."""
+    return False
 
 
 # ---------- Content-shell layout mode ----------

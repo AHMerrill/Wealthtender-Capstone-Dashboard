@@ -110,6 +110,7 @@ def eda_content():
     Output("eda-review-range", "max"),
     Output("eda-review-range", "value"),
     Output("eda-review-range", "marks"),
+    Output("eda-sliders-initialized", "data"),
     Input("eda-scope", "value"),
     Input("firm-dropdown", "value"),
     Input("eda-date-range", "start_date"),
@@ -122,12 +123,14 @@ def eda_content():
     Input("eda-exclude-stopwords", "value"),
     Input("eda-custom-stopwords", "value"),
     Input("url", "pathname"),
+    State("eda-sliders-initialized", "data"),
     prevent_initial_call=True,
 )
 def update_eda_charts(
     scope, firm_id, start_date, end_date, rating_value,
     token_range, review_range, ngram_size, ngram_topn,
     exclude_stopwords, custom_stopwords, pathname,
+    sliders_initialized,
 ):
     # Don't run when EDA page isn't loaded (outputs don't exist yet)
     if pathname != "/eda":
@@ -145,12 +148,18 @@ def update_eda_charts(
         params["date_end"] = end_date
     if rating_value != "all":
         params["rating"] = rating_value
-    if token_range and len(token_range) == 2:
-        params["min_tokens"] = token_range[0]
-        params["max_tokens"] = token_range[1]
-    if review_range and len(review_range) == 2:
-        params["min_reviews_per_advisor"] = review_range[0]
-        params["max_reviews_per_advisor"] = review_range[1]
+    # Only send slider values as filters AFTER the first successful load.
+    # On the first fire the sliders still hold layout placeholders (e.g.
+    # [0, 50] for reviews, [0, 1000] for tokens).  Sending those would
+    # incorrectly constrain the data.  After the first load we replace
+    # them with the real data range and set sliders_initialized = True.
+    if sliders_initialized:
+        if token_range and len(token_range) == 2:
+            params["min_tokens"] = token_range[0]
+            params["max_tokens"] = token_range[1]
+        if review_range and len(review_range) == 2:
+            params["min_reviews_per_advisor"] = review_range[0]
+            params["max_reviews_per_advisor"] = review_range[1]
     if ngram_size:
         params["lexical_n"] = ngram_size
     if ngram_topn:
@@ -178,6 +187,7 @@ def update_eda_charts(
             empty_fig, empty_fig, empty_fig,
             empty_fig, empty_fig, empty_fig,
             *(no_update,) * 10,
+            no_update,  # sliders_initialized stays as-is
         )
 
     # -- Unpack payload --
@@ -222,14 +232,16 @@ def update_eda_charts(
     # -- Slider / date-picker meta updates --
     token_min = meta.get("token_min", 0) or 0
     token_max = meta.get("token_max", 1000) or 1000
-    token_value = token_range if token_range else [token_min, token_max]
+    # Always snap to full data range — user adjustments trigger a new call
+    # which returns filtered meta, so the sliders stay consistent.
+    token_value = [token_min, token_max]
 
     start_value = start_date if start_date else meta.get("date_min")
     end_value = end_date if end_date else meta.get("date_max")
 
     review_min = meta.get("reviews_per_advisor_min", 0) or 0
     review_max = meta.get("reviews_per_advisor_max", 50) or 50
-    review_value = review_range if review_range else [review_min, review_max]
+    review_value = [review_min, review_max]
 
     return (
         summary_cards, coverage_cards, quality_cards,
@@ -237,6 +249,7 @@ def update_eda_charts(
         start_value, end_value,
         token_min, token_max, token_value, _range_marks(token_min, token_max),
         review_min, review_max, review_value, _range_marks(review_min, review_max),
+        True,  # mark sliders as initialized so future fires send filters
     )
 
 
