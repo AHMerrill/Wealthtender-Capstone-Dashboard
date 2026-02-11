@@ -52,6 +52,7 @@ store = ArtifactStore()
 # ---------------------------------------------------------------------------
 
 @app.get("/api/health")
+@app.head("/api/health")
 def health():
     return {"status": "ok"}
 
