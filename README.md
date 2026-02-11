@@ -98,8 +98,15 @@ Set-Location "$HOME\Projects\Wealthtender-Dashboard"
 
 ### Already cloned? Just pull the latest
 
+**macOS / Linux:**
 ```bash
 cd ~/Projects/Wealthtender-Dashboard
+git pull
+```
+
+**Windows PowerShell:**
+```powershell
+Set-Location "$HOME\Projects\Wealthtender-Dashboard"
 git pull
 ```
 
