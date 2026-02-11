@@ -1,12 +1,13 @@
 # Wealthtender Capstone Dashboard
 
-This repo contains two modular apps:
-- `api/` (FastAPI) serves normalized dashboard data.
-- `dashboard/` (Plotly Dash) renders views for firms and advisors.
+A two-service analytics dashboard built for the UT Austin MSBA 2026 Capstone with Wealthtender.
 
-## Quickstart (local)
+- **API** (`api/`) — FastAPI backend that serves normalized review data from pre-built artifacts.
+- **Dashboard** (`dashboard/`) — Plotly Dash frontend with EDA charts, firm/advisor views, and role-based access.
 
-### macOS / Linux (one command, single clone)
+## Quick Start
+
+### macOS / Linux
 
 ```bash
 REPO_DIR="$HOME/Projects/Wealthtender-Dashboard"
@@ -15,10 +16,10 @@ if [ -d "$REPO_DIR/.git" ]; then
 else
   mkdir -p "$REPO_DIR" && git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git "$REPO_DIR" && cd "$REPO_DIR"
 fi
-./run.sh
+bash run.sh
 ```
 
-### Windows PowerShell (one command, single clone)
+### Windows PowerShell
 
 ```powershell
 $RepoDir = "$HOME\Projects\Wealthtender-Dashboard"
@@ -33,150 +34,85 @@ if (Test-Path "$RepoDir\.git") {
 .\run.ps1
 ```
 
-### Open the dashboard
+Then open **http://localhost:8050**.
 
-After the script starts, open:
+The first run creates a virtualenv and installs dependencies (takes about a minute). After that, `bash run.sh` starts both services in seconds.
+
+> **Already cloned?** Just `cd` into the repo and run `bash run.sh`.
+
+## Project Structure
 
 ```
-http://localhost:8050
+api/                  FastAPI service — reads artifacts, exposes endpoints
+dashboard/            Dash app (multi-page) — calls the API, renders UI
+artifacts/            Data artifacts from the EDA pipeline
+  macro_insights/     Reviews, lexical data, quality reports (legacy dir name)
+data_contract/        Schema expectations
+docs/                 Brandbook and project docs
 ```
 
-You can also click:
+## Environment Variables
 
-[![Launch Dashboard](https://img.shields.io/badge/launch-dashboard-blue)](http://localhost:8050)
+See `.env.example` for all settings. Defaults work out of the box for local dev.
 
-### Already cloned?
+| Variable   | Default                 | Description                              |
+|------------|-------------------------|------------------------------------------|
+| `API_BASE` | `http://localhost:8000` | URL the dashboard uses to reach the API  |
+| `PORT`     | `8050` / `8000`         | Listening port for dashboard / API       |
 
-From the repo root, run:
-
-```bash
-./run.sh
-```
-
-Do not run `git clone` from inside an existing clone (it creates nested folders).
-
-Note: the first run installs dependencies and can take a minute. Subsequent runs are fast.
-
-### Local Files (where they are stored)
-
-Running the commands above downloads files to your local machine. The repo will be stored at:
-
-- macOS/Linux: `~/Projects/Wealthtender-Dashboard`
-- Windows: `C:\Users\<you>\Projects\Wealthtender-Dashboard`
-
-To remove the files later, delete that folder.
-
-## Edit and Push Workflow
-
-1. Clone the repo (or pull latest changes).
-2. Make local edits.
-3. Run the app and verify at `http://localhost:8050`.
-4. Commit and push to `main` when it looks correct.
-
-Example commands:
-
-```bash
-git status
-git add .
-git commit -m "Update dashboard"
-git push origin main
-```
-
-## Notes on Python Version
-
-This repo supports Python 3.9–3.13. The launcher prefers 3.12 or 3.11 if available,
-but will use your default `python3` if not.
-
-## Structure
-
-- `api/` FastAPI service that reads artifacts and exposes firm/advisor endpoints.
-- `dashboard/` Dash app (multi-page) that calls the API.
-- `artifacts/` Real artifacts (EDA + manifest in `artifacts/metadata.json`).
-- `data_contract/` Data contract and schema expectations.
-- `docs/` Brandbook and project docs.
-
-## Notes
-
-- Auth is stubbed. The dashboard currently uses a firm selector to simulate firm scoping.
-- Artifacts are loaded via the API. The dashboard does not read files directly.
-- EDA charts are built from the artifacts in `artifacts/macro_insights/` (legacy directory name from the original EDA pipeline).
-
-## EDA Data
-
-The EDA view is generated from these artifact files (directory is `macro_insights` for historical reasons; the codebase refers to this feature as "EDA" everywhere else):
-
-- `artifacts/macro_insights/reviews_clean.csv`
-- `artifacts/macro_insights/eda/eda_summary.json`
-- `artifacts/macro_insights/eda/coverage.json`
-- `artifacts/macro_insights/quality/quality_summary.json`
-- `artifacts/macro_insights/quality/raw_file_meta.json`
-- `artifacts/macro_insights/quality/missing_report.csv`
-- `artifacts/macro_insights/lexical/top_tokens.csv`
-- `artifacts/macro_insights/lexical/top_bigrams.csv`
-
-If you replace these artifacts with new exports from the EDA notebook, the dashboard will reflect the new outputs.
-
-## Running Locally
-
-### Quick start (no Docker)
-
-```bash
-bash run.sh
-```
-
-This creates a virtualenv, installs deps, starts the API on port 8000, and
-launches the Dash app on port 8050.
-
-### With Docker Compose
+## Docker Compose (alternative)
 
 ```bash
 docker compose up --build     # first time or after code changes
 docker compose up              # subsequent runs
 ```
 
-- Dashboard: http://localhost:8050
-- API: http://localhost:8000
-
-The compose file wires `API_BASE` automatically so the dashboard finds the API.
-
-### Environment variables
-
-See `.env.example` for all available settings. For local dev the defaults
-work out of the box. Copy it to `.env` if you need to customize.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `API_BASE` | `http://localhost:8000` | URL the dashboard uses to reach the API |
-| `PORT` | `8050` (dashboard) / `8000` (API) | Listening port for each service |
+Dashboard at http://localhost:8050, API at http://localhost:8000.
 
 ## Deployment
 
-### Render (recommended)
+Both services are containerized and deploy to any Docker-compatible host (Render, Railway, Fly.io, AWS ECS, GCP Cloud Run, etc.).
 
-The repo includes `render.yaml` which defines both services. To deploy:
+**Key steps for any platform:**
+1. Deploy the API service using `Dockerfile.api`.
+2. Deploy the dashboard service using `Dockerfile.dashboard`.
+3. Set `API_BASE` on the dashboard to the API's public URL.
 
-1. Push this repo to GitHub.
-2. In Render, click **New > Blueprint** and connect the repo.
-3. Render reads `render.yaml` and creates both services automatically.
-4. After the first deploy, update the dashboard's `API_BASE` env var to
-   match the actual API service URL (e.g. `https://wealthtender-api.onrender.com`).
+A `render.yaml` blueprint is included if using Render, but it is not the only option.
 
-### Other platforms
+## Auth
 
-Both Dockerfiles are standard and work on any container host (Railway, Fly.io,
-AWS ECS, GCP Cloud Run, etc.). Just set `API_BASE` on the dashboard service
-to point at the API.
+The splash page currently uses a role selector for demo purposes (Admin vs. Firm Portal). In production, replace this with your auth provider and inject the user's role and `firm_id` from the session.
 
-## Auth Handoff
+Common approaches:
+- Reverse proxy auth (Nginx + OAuth2 Proxy, SSO)
+- Firm-scoped JWTs enforced by API middleware
+- SSO at the hosting layer (Cloudflare Access, etc.)
 
-The dashboard already supports firm-scoped data. In production, the selected
-firm should come from the authenticated user context rather than a UI dropdown.
+## EDA Artifacts
 
-Common integration options:
-- **Reverse proxy auth** (Nginx + basic auth, OAuth2 Proxy, or SSO)
-- **Firm-scoped JWTs** enforced by the API middleware
-- **SSO** handled at the hosting layer (Render, Cloudflare Access, etc.)
+The EDA page is built from these files in `artifacts/macro_insights/` (legacy directory name):
 
-The splash page currently uses a role selector for demo purposes. In production,
-replace this with your auth provider and inject the user's role and firm_id
-from the session.
+- `reviews_clean.csv`
+- `eda/eda_summary.json`
+- `eda/coverage.json`
+- `quality/quality_summary.json`, `raw_file_meta.json`, `missing_report.csv`
+- `lexical/top_tokens.csv`, `top_bigrams.csv`
+
+Replace these with new exports from the EDA notebook and the dashboard updates automatically.
+
+## Python Version
+
+Supports Python 3.9–3.13. The launcher prefers 3.12 or 3.11 if available.
+
+## Edit and Push
+
+```bash
+# Make changes, test locally
+bash run.sh
+
+# Commit
+git add .
+git commit -m "Describe your change"
+git push origin main
+```

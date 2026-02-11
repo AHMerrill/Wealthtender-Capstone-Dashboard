@@ -178,7 +178,7 @@ app.layout = html.Div(
                                     value="all", clearable=False)),
                                 _filter("Reviews per Advisor", dcc.RangeSlider(
                                     id="eda-review-range",
-                                    min=0, max=50, step=1, value=[0, 50],
+                                    min=0, max=50, step=1, value=[0, 50],  # updated by API
                                     tooltip={"placement": "bottom",
                                              "always_visible": False})),
                                 _filter("Date Range", dcc.DatePickerRange(
@@ -207,13 +207,13 @@ app.layout = html.Div(
                                     id="eda-exclude-stopwords",
                                     options=[{"label": "Exclude common words",
                                               "value": "exclude"}],
-                                    value=[])),
+                                    value=["exclude"])),
 
                                 # --- Stopword customization panel ---
                                 html.Div(
                                     id="eda-stopword-picker-wrap",
                                     style={"marginTop": "8px",
-                                           "display": "none"},
+                                           "display": "block"},
                                     children=[
                                         html.Div(
                                             "NLTK default stopwords active.",
