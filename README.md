@@ -218,6 +218,20 @@ Both services are containerized and can deploy to any Docker-compatible host (Re
 
 A `render.yaml` blueprint is included for Render, but it is not the only option.
 
+### Current Render Setup
+
+The project is currently deployed on Render with the following environment variables already configured:
+
+| Service | Variable | Status |
+|---------|----------|--------|
+| `wt-api` | `PORT` | Set |
+| `wt-api` | `API_KEY` | Set (shared secret) |
+| `wt-dash` | `API_BASE` | Set (points to `wt-api`) |
+| `wt-dash` | `API_KEY` | Set (same key as `wt-api`) |
+| `wt-dash` | `ADMIN_PASSWORD` | Set |
+
+If you need to rotate the API key or change the admin password, update the values in each service's **Environment** tab on the [Render dashboard](https://dashboard.render.com). The `API_KEY` must match on both services.
+
 ---
 
 ## 9. Auth & Security
@@ -226,15 +240,15 @@ There are two layers of authentication:
 
 ### API Key (service-to-service)
 
-The API rejects any request without a valid `X-API-Key` header. The dashboard sends this header automatically. Both services read the key from the `API_KEY` environment variable.
+The API rejects any request without a valid `X-API-Key` header. The dashboard sends this header automatically. Both services read the key from the `API_KEY` environment variable. An API key is already set on both Render services.
 
 - **Locally:** `API_KEY` is empty by default, so auth is skipped. Nothing to configure.
-- **On Render:** Set the same `API_KEY` value on both `wt-api` and `wt-dash` in their Environment tabs.
+- **On Render:** The `API_KEY` is already configured on both `wt-api` and `wt-dash`. To rotate it, update the value on both services in their Environment tabs — they must always match.
 - The `/api/health` endpoint is always open (required for health checks).
 
 ### Admin Password (user-facing)
 
-The admin portal on the splash page requires a password before granting access. The password is read from `ADMIN_PASSWORD` (defaults to `WT$msba2026`). The check is server-side and cannot be bypassed from the browser.
+The admin portal on the splash page requires a password before granting access. The password is read from `ADMIN_PASSWORD` (defaults to `WT$msba2026`). This is already set on Render. The check is server-side and cannot be bypassed from the browser.
 
 ---
 
