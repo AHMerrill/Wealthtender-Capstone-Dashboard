@@ -25,7 +25,9 @@ API_KEY = os.getenv("API_KEY", "")
 # ---------------------------------------------------------------------------
 
 _session = requests.Session()
-_retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504])
+# Only auto-retry on actual server errors. Do NOT retry on 429 -- that makes
+# rate-limiting worse by hammering the API with extra requests during cold start.
+_retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[502, 503, 504])
 _session.mount("http://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
 _session.mount("https://", HTTPAdapter(max_retries=_retry, pool_maxsize=20))
 
@@ -41,7 +43,13 @@ def _get(path: str, params: Optional[Dict] = None, timeout: int = 30) -> Any:
         resp = _session.get(url, params=params, timeout=timeout)
         if resp.status_code == 200:
             return resp.json()
-        log.warning("API %s returned %s: %s", url, resp.status_code, resp.text[:200])
+        if resp.status_code == 429:
+            # Rate-limited (common during Render cold start) — return None
+            # quietly so the dashboard shows empty data and the interval
+            # callback retries on its own schedule.
+            log.info("API rate-limited (429): %s — will retry on next callback", path)
+        else:
+            log.warning("API %s returned %s: %s", url, resp.status_code, resp.text[:200])
     except requests.ConnectionError:
         log.warning("API unreachable: %s (is the API service running?)", url)
     except requests.Timeout:
