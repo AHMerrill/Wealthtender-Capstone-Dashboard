@@ -4,7 +4,9 @@ import logging
 import threading
 from pathlib import Path
 
-from dashboard.services.api import get_firms, get_stopwords, warm_api, is_api_ready
+from dashboard.services.api import (
+    get_firms, get_stopwords, warm_api, is_api_ready, get_dna_entities,
+)
 from dashboard.components.eda_content import eda_content
 from dashboard.branding import ensure_theme_css
 from dashboard.roles import ROLES, nav_links_for_role, pages_for_role, get_role_config
@@ -331,7 +333,78 @@ app.layout = html.Div(
                             ],
                         ),
 
-                        # Placeholder for non-EDA pages
+                        # Advisor DNA filters
+                        html.Div(
+                            id="dna-filters-section",
+                            className="sidebar-section",
+                            style={"display": "none"},
+                            children=[
+                                html.Div(className="filter-group", children=[
+                                    html.Div("Search By", className="filter-label"),
+                                    dcc.RadioItems(
+                                        id="dna-entity-type",
+                                        options=[
+                                            {"label": "Firm", "value": "firm"},
+                                            {"label": "Advisor", "value": "advisor"},
+                                        ],
+                                        value="firm",
+                                        inline=True,
+                                    ),
+                                ]),
+                                html.Div(className="filter-group",
+                                         style={"marginTop": "8px"}, children=[
+                                    html.Div("Select Entity", className="filter-label"),
+                                    dcc.Dropdown(
+                                        id="dna-entity-search",
+                                        placeholder="Search...",
+                                        searchable=True,
+                                        clearable=True,
+                                    ),
+                                ]),
+                                html.Div(
+                                    id="dna-method-group",
+                                    className="filter-group",
+                                    style={"display": "none", "marginTop": "12px"},
+                                    children=[
+                                        html.Div("Scoring Method",
+                                                 className="filter-label"),
+                                        dcc.RadioItems(
+                                            id="dna-method-selector",
+                                            options=[
+                                                {"label": "Mean — simple average of all review embeddings",
+                                                 "value": "mean"},
+                                                {"label": "Penalized — older reviews down-weighted by staleness",
+                                                 "value": "penalized"},
+                                                {"label": "Weighted — time-weighted, recent reviews count more",
+                                                 "value": "weighted"},
+                                            ],
+                                            value="mean",
+                                            inline=False,
+                                            labelStyle={"display": "block",
+                                                        "marginBottom": "6px",
+                                                        "fontSize": "12px"},
+                                        ),
+                                    ],
+                                ),
+                                html.Button(
+                                    "Reset to Macro View",
+                                    id="dna-reset-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "marginTop": "12px",
+                                        "fontSize": "12px",
+                                        "cursor": "pointer",
+                                        "background": "none",
+                                        "border": "1px solid #ccc",
+                                        "borderRadius": "4px",
+                                        "padding": "6px 12px",
+                                        "width": "100%",
+                                    },
+                                ),
+                            ],
+                        ),
+
+                        # Placeholder for non-EDA/non-DNA pages
                         html.Div(id="sidebar-page-note",
                                  style={"display": "none", "marginTop": "12px"},
                                  children=[
@@ -419,7 +492,7 @@ def navigate_on_role_change(user_role_data, current_path):
     if not role:
         return "/" if current_path != "/" else no_update
     if current_path == "/":
-        dest = "/eda" if role == "admin" else "/firm-overview"
+        dest = "/eda" if role == "admin" else "/advisor-dna"
         log.info("navigate_on_role_change -> %s", dest)
         return dest
     return no_update
@@ -499,6 +572,7 @@ def load_firm_options(user_role_data, already_loaded, cur_value):
     Output("firm-locked-display", "style"),
     Output("firm-locked-name", "children"),
     Output("eda-filters-section", "style"),
+    Output("dna-filters-section", "style"),
     Output("sidebar-page-note", "style"),
     Input("url", "pathname"),
     Input("user-role", "data"),
@@ -509,15 +583,19 @@ def update_sidebar(pathname, user_role_data):
     hide = {"display": "none"}
 
     if not role or pathname == "/":
-        return hide, "", hide, hide, "", hide, hide
+        return hide, "", hide, hide, "", hide, hide, hide
 
     cfg = get_role_config(role)
     badge = html.Span(
         cfg.get("label", role.title()),
         style={"fontSize": "11px", "color": "#6b7280", "fontStyle": "italic"})
 
-    # Firm picker vs locked
-    if cfg.get("show_firm_picker"):
+    # Firm picker vs locked (hide on DNA page -- it has its own entity search)
+    if pathname == "/advisor-dna":
+        fg = hide
+        fl = hide
+        fn = ""
+    elif cfg.get("show_firm_picker"):
         fg = {"display": "block", "marginTop": "8px"}
         fl = hide
         fn = ""
@@ -530,12 +608,12 @@ def update_sidebar(pathname, user_role_data):
         fl = hide
         fn = ""
 
-    eda = ({"display": "block"}
-           if pathname == "/eda" and "/eda" in pages_for_role(role)
-           else hide)
-    note = {"display": "block"} if pathname != "/eda" else hide
+    allowed = pages_for_role(role)
+    eda = {"display": "block"} if pathname == "/eda" and "/eda" in allowed else hide
+    dna = {"display": "block"} if pathname == "/advisor-dna" and "/advisor-dna" in allowed else hide
+    note = {"display": "block"} if pathname not in ("/eda", "/advisor-dna") else hide
 
-    return {"display": "block"}, badge, fg, fl, fn, eda, note
+    return {"display": "block"}, badge, fg, fl, fn, eda, dna, note
 
 
 # ---------- Stopword panel: show/hide + load defaults ----------
@@ -677,6 +755,59 @@ def toggle_content(pathname, user_role_data):
     ])
     return {}, hide, hide, {"display": "block", "padding": "40px",
                              "textAlign": "center"}, denied
+
+
+# ---------- Advisor DNA sidebar callbacks ----------
+
+@callback(
+    Output("dna-entity-search", "options"),
+    Output("dna-entity-search", "value"),
+    Input("dna-entity-type", "value"),
+    Input("dna-reset-btn", "n_clicks"),
+    Input("url", "pathname"),
+)
+def update_dna_entity_options(entity_type, reset_clicks, pathname):
+    ctx = dash.callback_context
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
+
+    if trigger == "dna-reset-btn":
+        return [], None
+
+    entities = get_dna_entities()
+    if entity_type == "firm":
+        items = entities.get("firms", [])
+    else:
+        items = entities.get("advisors", [])
+
+    options = [
+        {"label": e.get("advisor_name", e.get("advisor_id", "")),
+         "value": e.get("advisor_id", "")}
+        for e in items
+    ]
+    options.sort(key=lambda o: o["label"])
+    return options, None
+
+
+@callback(
+    Output("dna-method-group", "style"),
+    Input("dna-entity-type", "value"),
+    Input("dna-entity-search", "value"),
+)
+def toggle_method_selector(entity_type, entity_id):
+    if entity_id:
+        return {"display": "block", "marginTop": "12px"}
+    return {"display": "none", "marginTop": "12px"}
+
+
+@callback(
+    Output("dna-current-view", "data"),
+    Input("dna-reset-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def reset_dna_view(n_clicks):
+    if n_clicks:
+        return "macro"
+    return no_update
 
 
 # ---------- Entry point ----------

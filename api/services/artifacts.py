@@ -103,6 +103,12 @@ class ArtifactStore:
         self.macro_top_tokens = self._load_table("macro_top_tokens")
         self.macro_top_bigrams = self._load_table("macro_top_bigrams")
 
+        # Advisor DNA scoring artifacts
+        self.review_dim_scores = self._load_table("review_dimension_scores")
+        self.advisor_dim_scores = self._load_table("advisor_dimension_scores")
+        self._dna_macro_cache: Optional[list] = None
+        self._enrich_review_dim_scores()
+
         # Capabilities
         self.has_firms = (
             not self.scores.empty
@@ -329,6 +335,121 @@ class ArtifactStore:
             .assign(persona=lambda d: d["score"].apply(_score_to_persona))
         )
         return _sanitize_records(personas)
+
+    def _enrich_review_dim_scores(self):
+        """Join reviewer_name and review_date from reviews_clean into scoring data."""
+        if self.review_dim_scores.empty or self.macro_reviews_clean.empty:
+            return
+        clean = self.macro_reviews_clean
+        enrich_cols = []
+        if "reviewer_name" in clean.columns:
+            enrich_cols.append("reviewer_name")
+        if "review_date" in clean.columns:
+            enrich_cols.append("review_date")
+        if not enrich_cols:
+            return
+        extra = clean[enrich_cols].copy()
+        extra.index = range(len(extra))
+        scores = self.review_dim_scores
+        for col in enrich_cols:
+            if col not in scores.columns and scores.index.max() < len(extra):
+                scores[col] = scores["review_idx"].map(extra[col])
+        self.review_dim_scores = scores
+
+    # ----------------------------------------------------------------------------------
+    # Advisor DNA
+    # ----------------------------------------------------------------------------------
+
+    _SIM_DIMS = [
+        "trust_integrity", "listening_personalization", "communication_clarity",
+        "responsiveness_availability", "life_event_support", "investment_expertise",
+    ]
+    _REVIEW_SIM_COLS = [f"sim_{d}" for d in _SIM_DIMS]
+
+    def dna_macro_sample(self, n: int = 100, seed: int = 42) -> list:
+        """Return a sampled subset of reviews (for network graphs)."""
+        if self.review_dim_scores.empty:
+            return []
+        if self._dna_macro_cache is not None:
+            return self._dna_macro_cache
+        sample = self.review_dim_scores.sample(n=min(n, len(self.review_dim_scores)),
+                                               random_state=seed)
+        cols = ["review_idx", "advisor_id", "advisor_name", "entity_type"] + self._REVIEW_SIM_COLS
+        self._dna_macro_cache = _sanitize_records(sample[[c for c in cols if c in sample.columns]])
+        return self._dna_macro_cache
+
+    def dna_macro_totals(self) -> dict:
+        """Return aggregate dimension totals across ALL reviews."""
+        if self.review_dim_scores.empty:
+            return {}
+        totals = {}
+        for col in self._REVIEW_SIM_COLS:
+            if col in self.review_dim_scores.columns:
+                totals[col] = float(self.review_dim_scores[col].sum())
+        return {"totals": totals, "review_count": len(self.review_dim_scores)}
+
+    def dna_entity_list(self) -> Dict[str, list]:
+        if self.advisor_dim_scores.empty:
+            return {"firms": [], "advisors": []}
+        df = self.advisor_dim_scores[["advisor_id", "advisor_name", "entity_type"]].drop_duplicates()
+        firms = _sanitize_records(df[df["entity_type"] == "firm"][["advisor_id", "advisor_name"]])
+        advisors = _sanitize_records(df[df["entity_type"] == "advisor"][["advisor_id", "advisor_name"]])
+        return {"firms": firms, "advisors": advisors}
+
+    def dna_entity_reviews(self, entity_id: str) -> Optional[list]:
+        if self.review_dim_scores.empty:
+            return None
+        df = self.review_dim_scores[self.review_dim_scores["advisor_id"] == entity_id]
+        if df.empty:
+            return None
+        cols = ["review_idx", "advisor_id", "advisor_name", "entity_type",
+                "review_text_raw", "reviewer_name", "review_date"] + self._REVIEW_SIM_COLS
+        return _sanitize_records(df[[c for c in cols if c in df.columns]])
+
+    def dna_advisor_scores(self, entity_id: str, method: str = "mean") -> Optional[Dict]:
+        if self.advisor_dim_scores.empty:
+            return None
+        df = self.advisor_dim_scores[self.advisor_dim_scores["advisor_id"] == entity_id]
+        if df.empty:
+            return None
+        row = df.iloc[0]
+        sim_cols = [f"sim_{method}_{d}" for d in self._SIM_DIMS]
+        missing = [c for c in sim_cols if c not in df.columns]
+        if missing:
+            return None
+        scores = {d: float(row[f"sim_{method}_{d}"]) for d in self._SIM_DIMS}
+        return {
+            "advisor_id": row["advisor_id"],
+            "advisor_name": row["advisor_name"],
+            "entity_type": row["entity_type"],
+            "method": method,
+            "scores": scores,
+        }
+
+    def dna_review_detail(self, review_idx: int) -> Optional[Dict]:
+        if self.review_dim_scores.empty:
+            return None
+        df = self.review_dim_scores
+        if "review_idx" not in df.columns:
+            return None
+        match = df[df["review_idx"] == review_idx]
+        if match.empty:
+            return None
+        row = match.iloc[0]
+        scores = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{d}"
+            scores[d] = float(row[col]) if col in row.index and pd.notna(row[col]) else None
+        return {
+            "review_idx": int(row["review_idx"]),
+            "advisor_id": row.get("advisor_id"),
+            "advisor_name": row.get("advisor_name"),
+            "entity_type": row.get("entity_type"),
+            "review_text": row.get("review_text_raw"),
+            "reviewer_name": row.get("reviewer_name"),
+            "review_date": str(row.get("review_date", "")) if pd.notna(row.get("review_date")) else "",
+            "scores": scores,
+        }
 
     # ----------------------------------------------------------------------------------
     # EDA

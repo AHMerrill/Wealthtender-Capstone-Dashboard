@@ -16,3 +16,4 @@ project_definition_guide
 !requirements.txt
 .dockerignore
 .gitignore
+notebooks

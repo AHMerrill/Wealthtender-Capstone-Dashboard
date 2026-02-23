@@ -92,6 +92,31 @@ def get_review_detail(review_id: str) -> dict:
     return _get(f"/api/reviews/{review_id}") or {}
 
 
+def get_dna_macro() -> list:
+    return _get("/api/advisor-dna/macro") or []
+
+
+def get_dna_macro_totals() -> dict:
+    return _get("/api/advisor-dna/macro-totals") or {}
+
+
+def get_dna_entities() -> dict:
+    return _get("/api/advisor-dna/entities") or {"firms": [], "advisors": []}
+
+
+def get_dna_entity_reviews(entity_id: str) -> list:
+    return _get("/api/advisor-dna/entity-reviews", params={"entity_id": entity_id}) or []
+
+
+def get_dna_advisor_scores(entity_id: str, method: str = "mean") -> dict:
+    return _get("/api/advisor-dna/advisor-scores",
+                params={"entity_id": entity_id, "method": method}) or {}
+
+
+def get_dna_review_detail(review_idx: int) -> dict:
+    return _get(f"/api/advisor-dna/review/{review_idx}") or {}
+
+
 # ---------------------------------------------------------------------------
 # API warm-up with retry (critical for Render cold-start)
 # ---------------------------------------------------------------------------

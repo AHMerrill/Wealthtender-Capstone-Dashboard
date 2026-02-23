@@ -14,6 +14,8 @@ COLORS = {
     "soft_lavender": "#ebebff",
     "red": "#790000",
     "bg": "#f8fbff",
+    "border": "#e5e7eb",
+    "card_bg": "#fafafa",
 }
 
 # Brand-anchored palette: WT blues as the backbone, complemented by

@@ -10,6 +10,8 @@
     {"name": "macro_raw_file_meta", "type": "json", "path": "artifacts/macro_insights/quality/raw_file_meta.json"},
     {"name": "macro_missing_report", "type": "csv", "path": "artifacts/macro_insights/quality/missing_report.csv"},
     {"name": "macro_top_tokens", "type": "csv", "path": "artifacts/macro_insights/lexical/top_tokens.csv"},
-    {"name": "macro_top_bigrams", "type": "csv", "path": "artifacts/macro_insights/lexical/top_bigrams.csv"}
+    {"name": "macro_top_bigrams", "type": "csv", "path": "artifacts/macro_insights/lexical/top_bigrams.csv"},
+    {"name": "review_dimension_scores", "type": "csv", "path": "artifacts/scoring/review_dimension_scores.csv"},
+    {"name": "advisor_dimension_scores", "type": "csv", "path": "artifacts/scoring/advisor_dimension_scores.csv"}
   ]
 }

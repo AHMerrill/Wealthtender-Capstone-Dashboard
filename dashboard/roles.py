@@ -24,9 +24,7 @@ ROLES = {
         "desc": "Full access to all firms, advisors, EDA, and methodology.",
         "pages": [
             "/eda",
-            "/firm-overview",
-            "/advisor",
-            "/personas",
+            "/advisor-dna",
             "/benchmarks",
             "/methodology",
         ],
@@ -37,9 +35,7 @@ ROLES = {
         "label": "Firm Portal",
         "desc": "View your firm's advisors, scores, and industry benchmarks.",
         "pages": [
-            "/firm-overview",
-            "/advisor",
-            "/personas",
+            "/advisor-dna",
             "/benchmarks",
         ],
         "show_firm_picker": False,   # firm comes from auth context
@@ -75,5 +71,7 @@ def nav_links_for_role(role: str) -> list[tuple[str, str]]:
         # Special-case short labels
         if path == "/eda":
             label = "EDA"
+        elif path == "/advisor-dna":
+            label = "Advisor DNA"
         links.append((label, path))
     return links

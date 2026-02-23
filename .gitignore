@@ -21,3 +21,8 @@ wt_dash_secrets.txt
 eda/
 project_definition_guide/
 Brandbook/
+
+# Large notebook data files (keep .ipynb notebooks)
+notebooks/collaborator/*.csv
+notebooks/collaborator/*.parquet
+notebooks/.DS_Store

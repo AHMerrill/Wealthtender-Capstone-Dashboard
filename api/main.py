@@ -187,3 +187,55 @@ def review_detail(review_id: str):
     if detail is None:
         raise HTTPException(status_code=404, detail="review not found")
     return detail
+
+
+# ---------------------------------------------------------------------------
+# Advisor DNA
+# ---------------------------------------------------------------------------
+
+@app.get("/api/advisor-dna/macro")
+def advisor_dna_macro():
+    data = store.dna_macro_sample()
+    if not data:
+        raise HTTPException(status_code=404, detail="Advisor DNA data not available")
+    return data
+
+
+@app.get("/api/advisor-dna/macro-totals")
+def advisor_dna_macro_totals():
+    data = store.dna_macro_totals()
+    if not data:
+        raise HTTPException(status_code=404, detail="Advisor DNA data not available")
+    return data
+
+
+@app.get("/api/advisor-dna/entities")
+def advisor_dna_entities():
+    return store.dna_entity_list()
+
+
+@app.get("/api/advisor-dna/entity-reviews")
+def advisor_dna_entity_reviews(entity_id: str = Query(...)):
+    reviews = store.dna_entity_reviews(entity_id)
+    if reviews is None:
+        raise HTTPException(status_code=404, detail="entity not found")
+    return reviews
+
+
+@app.get("/api/advisor-dna/advisor-scores")
+def advisor_dna_advisor_scores(
+    entity_id: str = Query(...),
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+):
+    scores = store.dna_advisor_scores(entity_id, method)
+    if scores is None:
+        raise HTTPException(status_code=404, detail="entity or method not found")
+    return scores
+
+
+@app.get("/api/advisor-dna/review/{review_idx}")
+def advisor_dna_review_detail(review_idx: int):
+    detail = store.dna_review_detail(review_idx)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="review not found")
+    return detail
