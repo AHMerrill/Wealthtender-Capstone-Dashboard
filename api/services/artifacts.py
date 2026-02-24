@@ -426,6 +426,69 @@ class ArtifactStore:
             "scores": scores,
         }
 
+    def dna_percentile_scores(self, entity_id: str, method: str = "mean") -> Optional[Dict]:
+        """Percentile rank of this entity vs peers of the same type, per dimension."""
+        if self.advisor_dim_scores.empty:
+            return None
+        all_df = self.advisor_dim_scores
+        match = all_df[all_df["advisor_id"] == entity_id]
+        if match.empty:
+            return None
+        entity_type = match.iloc[0]["entity_type"]
+        peers = all_df[all_df["entity_type"] == entity_type].copy()
+        sim_cols = [f"sim_{method}_{d}" for d in self._SIM_DIMS]
+        if any(c not in peers.columns for c in sim_cols):
+            return None
+        pct_ranks = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            peers[f"_pctrank_{d}"] = peers[col].rank(pct=True)
+        entity_row = peers[peers["advisor_id"] == entity_id].iloc[0]
+        scores = {d: round(float(entity_row[f"_pctrank_{d}"]) * 100, 1)
+                  for d in self._SIM_DIMS}
+        return {
+            "advisor_id": entity_row["advisor_id"],
+            "advisor_name": entity_row["advisor_name"],
+            "entity_type": entity_type,
+            "method": method,
+            "peer_count": len(peers),
+            "scores": scores,
+        }
+
+    def dna_population_medians(self, method: str = "mean", entity_type: str = "firm") -> Dict:
+        """Return per-dimension median similarity across all entities of a given type."""
+        if self.advisor_dim_scores.empty:
+            return {}
+        peers = self.advisor_dim_scores[self.advisor_dim_scores["entity_type"] == entity_type]
+        if peers.empty:
+            return {}
+        medians = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            if col in peers.columns:
+                medians[d] = float(peers[col].median())
+        return medians
+
+    def dna_method_breakpoints(self, method: str = "mean",
+                               entity_type: str = "firm") -> Dict:
+        """Return 25th/50th/75th percentile breakpoints per dimension for a method."""
+        if self.advisor_dim_scores.empty:
+            return {}
+        peers = self.advisor_dim_scores[
+            self.advisor_dim_scores["entity_type"] == entity_type]
+        if peers.empty:
+            return {}
+        result = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            if col in peers.columns:
+                result[d] = {
+                    "p25": float(peers[col].quantile(0.25)),
+                    "p50": float(peers[col].quantile(0.50)),
+                    "p75": float(peers[col].quantile(0.75)),
+                }
+        return result
+
     def dna_review_detail(self, review_idx: int) -> Optional[Dict]:
         if self.review_dim_scores.empty:
             return None

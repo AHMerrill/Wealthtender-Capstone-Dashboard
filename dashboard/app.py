@@ -371,11 +371,11 @@ app.layout = html.Div(
                                         dcc.RadioItems(
                                             id="dna-method-selector",
                                             options=[
-                                                {"label": "Mean — simple average of all review embeddings",
+                                                {"label": "Mean \u2014 equal weight across all reviews",
                                                  "value": "mean"},
-                                                {"label": "Penalized — older reviews down-weighted by staleness",
+                                                {"label": "Penalized \u2014 older reviews down-weighted",
                                                  "value": "penalized"},
-                                                {"label": "Weighted — time-weighted, recent reviews count more",
+                                                {"label": "Weighted \u2014 recent reviews weighted more",
                                                  "value": "weighted"},
                                             ],
                                             value="mean",
@@ -383,6 +383,87 @@ app.layout = html.Div(
                                             labelStyle={"display": "block",
                                                         "marginBottom": "6px",
                                                         "fontSize": "12px"},
+                                        ),
+                                        html.Button(
+                                            "Read more \u25bc",
+                                            id="dna-method-info-toggle",
+                                            n_clicks=0,
+                                            style={
+                                                "fontSize": "11px",
+                                                "cursor": "pointer",
+                                                "background": "none",
+                                                "color": "#004C8C",
+                                                "border": "none",
+                                                "textDecoration": "underline",
+                                                "fontFamily": "inherit",
+                                                "padding": "0",
+                                                "marginTop": "2px",
+                                            },
+                                        ),
+                                        html.Div(
+                                            id="dna-method-info-panel",
+                                            style={"display": "none"},
+                                            children=[
+                                                html.Div([
+                                                    html.Div("Mean", style={
+                                                        "fontWeight": "700",
+                                                        "fontSize": "12px",
+                                                        "marginBottom": "2px",
+                                                    }),
+                                                    html.Div(
+                                                        "Averages the embedding vectors of all "
+                                                        "reviews for this entity. Every review "
+                                                        "contributes equally regardless of age. "
+                                                        "Best for a balanced, all-time view.",
+                                                        style={"fontSize": "11px",
+                                                               "marginBottom": "8px"},
+                                                    ),
+                                                    html.Div("Penalized", style={
+                                                        "fontWeight": "700",
+                                                        "fontSize": "12px",
+                                                        "marginBottom": "2px",
+                                                    }),
+                                                    html.Div(
+                                                        "Applies a staleness penalty that "
+                                                        "down-weights older reviews. Reviews "
+                                                        "lose influence as they age. Useful for "
+                                                        "surfacing whether recent feedback "
+                                                        "differs from the historical pattern.",
+                                                        style={"fontSize": "11px",
+                                                               "marginBottom": "8px"},
+                                                    ),
+                                                    html.Div("Weighted", style={
+                                                        "fontWeight": "700",
+                                                        "fontSize": "12px",
+                                                        "marginBottom": "2px",
+                                                    }),
+                                                    html.Div(
+                                                        "Time-weighted average where the most "
+                                                        "recent reviews carry the greatest "
+                                                        "influence. Best reflects current client "
+                                                        "sentiment and performance trajectory.",
+                                                        style={"fontSize": "11px",
+                                                               "marginBottom": "8px"},
+                                                    ),
+                                                    html.Div(
+                                                        "All three methods operate on the "
+                                                        "embedding vectors before computing "
+                                                        "similarity to each dimension, not on "
+                                                        "the final scores.",
+                                                        style={"fontSize": "11px",
+                                                               "fontStyle": "italic",
+                                                               "color": "#6b7280"},
+                                                    ),
+                                                ], style={
+                                                    "marginTop": "8px",
+                                                    "padding": "10px 12px",
+                                                    "border": "1px solid #e5e7eb",
+                                                    "borderRadius": "8px",
+                                                    "background": "#fafafa",
+                                                    "color": "#1e293b",
+                                                    "lineHeight": "1.5",
+                                                }),
+                                            ],
                                         ),
                                     ],
                                 ),
@@ -491,10 +572,6 @@ def navigate_on_role_change(user_role_data, current_path):
     log.info("navigate_on_role_change: role=%s  path=%s", role, current_path)
     if not role:
         return "/" if current_path != "/" else no_update
-    if current_path == "/":
-        dest = "/eda" if role == "admin" else "/advisor-dna"
-        log.info("navigate_on_role_change -> %s", dest)
-        return dest
     return no_update
 
 
@@ -770,20 +847,25 @@ def update_dna_entity_options(entity_type, reset_clicks, pathname):
     ctx = dash.callback_context
     trigger = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
 
-    if trigger == "dna-reset-btn":
-        return [], None
+    clear_value = trigger == "dna-reset-btn"
 
+    entity_type = entity_type or "firm"
     entities = get_dna_entities()
     if entity_type == "firm":
         items = entities.get("firms", [])
     else:
         items = entities.get("advisors", [])
 
-    options = [
-        {"label": e.get("advisor_name", e.get("advisor_id", "")),
-         "value": e.get("advisor_id", "")}
-        for e in items
-    ]
+    max_len = 60
+    options = []
+    for e in items:
+        full_name = e.get("advisor_name", e.get("advisor_id", ""))
+        label = (full_name[:max_len] + "\u2026") if len(full_name) > max_len else full_name
+        options.append({
+            "label": label,
+            "value": e.get("advisor_id", ""),
+            "title": full_name,
+        })
     options.sort(key=lambda o: o["label"])
     return options, None
 
@@ -797,6 +879,18 @@ def toggle_method_selector(entity_type, entity_id):
     if entity_id:
         return {"display": "block", "marginTop": "12px"}
     return {"display": "none", "marginTop": "12px"}
+
+
+@callback(
+    Output("dna-method-info-panel", "style"),
+    Output("dna-method-info-toggle", "children"),
+    Input("dna-method-info-toggle", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_method_info(n_clicks):
+    if n_clicks and n_clicks % 2 == 1:
+        return {"display": "block"}, "Read less \u25b2"
+    return {"display": "none"}, "Read more \u25bc"
 
 
 @callback(

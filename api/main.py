@@ -233,6 +233,33 @@ def advisor_dna_advisor_scores(
     return scores
 
 
+@app.get("/api/advisor-dna/percentile-scores")
+def advisor_dna_percentile_scores(
+    entity_id: str = Query(...),
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+):
+    scores = store.dna_percentile_scores(entity_id, method)
+    if scores is None:
+        raise HTTPException(status_code=404, detail="entity or method not found")
+    return scores
+
+
+@app.get("/api/advisor-dna/population-medians")
+def advisor_dna_population_medians(
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+    entity_type: str = "firm",
+):
+    return store.dna_population_medians(method, entity_type)
+
+
+@app.get("/api/advisor-dna/method-breakpoints")
+def advisor_dna_method_breakpoints(
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+    entity_type: str = "firm",
+):
+    return store.dna_method_breakpoints(method, entity_type)
+
+
 @app.get("/api/advisor-dna/review/{review_idx}")
 def advisor_dna_review_detail(review_idx: int):
     detail = store.dna_review_detail(review_idx)

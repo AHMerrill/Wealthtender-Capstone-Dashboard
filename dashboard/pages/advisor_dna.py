@@ -7,6 +7,8 @@ from dashboard.services.api import (
     get_dna_macro_totals,
     get_dna_entity_reviews,
     get_dna_advisor_scores,
+    get_dna_percentile_scores,
+    get_dna_method_breakpoints,
 )
 
 dash.register_page(__name__, path="/advisor-dna", title="Advisor DNA")
@@ -58,45 +60,68 @@ DIM_QUERY_TEXTS = {
 
 _DIM_LABEL_TO_KEY = {v: k for k, v in DIM_LABELS.items()}
 
+# Default tier breakpoints from review-level quartiles (fallback).
+_DEFAULT_BREAKPOINTS = {"p75": 0.4376, "p50": 0.3613, "p25": 0.2827}
+
+_TIER_LABELS = ("Very Strong", "Strong", "Above Average", "Average")
+
+
+def _score_tier(val: float, bp=None) -> str:
+    """Assign a tier label based on breakpoints (p75/p50/p25)."""
+    b = bp or _DEFAULT_BREAKPOINTS
+    if val >= b.get("p75", 0.4376):
+        return _TIER_LABELS[0]
+    if val >= b.get("p50", 0.3613):
+        return _TIER_LABELS[1]
+    if val >= b.get("p25", 0.2827):
+        return _TIER_LABELS[2]
+    return _TIER_LABELS[3]
+
 
 # ---------------------------------------------------------------------------
 # Chart builders
 # ---------------------------------------------------------------------------
 
-def _build_pie(dim_totals, review_count, title="Dimension Strength"):
-    grand = sum(dim_totals.values()) or 1
+def _pctile_tier(pctile: float) -> str:
+    if pctile >= 75:
+        return _TIER_LABELS[0]
+    if pctile >= 50:
+        return _TIER_LABELS[1]
+    if pctile >= 25:
+        return _TIER_LABELS[2]
+    return _TIER_LABELS[3]
+
+
+def _build_macro_pie(dim_totals, review_count, title="Dimension Strength"):
+    """Macro pie — wedge labels show rank ordering (#1, #2, ...), no tiers."""
+    ranked = sorted(DIMENSIONS, key=lambda d: dim_totals.get(d, 0), reverse=True)
+    rank_map = {d: i + 1 for i, d in enumerate(ranked)}
+
     labels = [DIM_LABELS[d] for d in DIMENSIONS]
     values = [dim_totals.get(d, 0) for d in DIMENSIONS]
     colors = [DIM_COLORS[d] for d in DIMENSIONS]
-    pcts = [dim_totals.get(d, 0) / grand for d in DIMENSIONS]
+    ranks = [f"#{rank_map[d]}" for d in DIMENSIONS]
     hovers = [
-        f"<b>{DIM_LABELS[d]}</b><br>"
-        f"Score: {dim_totals.get(d, 0):.3f}<br>"
-        f"{pcts[i]:.1%} of overall<br><br>"
+        f"<b>{DIM_LABELS[d]}</b> (Rank {rank_map[d]})<br><br>"
         f"<i>{DIM_DESCRIPTIONS[d]}</i>"
-        for i, d in enumerate(DIMENSIONS)
+        for d in DIMENSIONS
     ]
 
     fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
+        labels=labels, values=values,
         marker=dict(colors=colors, line=dict(color="white", width=2)),
         pull=[0.05] * len(DIMENSIONS),
-        textinfo="label+percent",
+        textinfo="label+text", text=ranks,
         textposition="outside",
         textfont=dict(size=13, family=FONT_FAMILY, color=COLORS["ink"]),
-        hovertext=hovers,
-        hoverinfo="text",
-        hole=0.35,
-        sort=False,
+        hovertext=hovers, hoverinfo="text",
+        hole=0.35, sort=False,
     )])
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
         showlegend=False,
-        margin=dict(l=40, r=40, t=50, b=20),
-        height=480,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
+        margin=dict(l=40, r=40, t=50, b=20), height=480,
+        paper_bgcolor="white", plot_bgcolor="white",
         title=dict(text=title, font=dict(size=16, color=COLORS["navy"]), x=0.5),
         annotations=[dict(
             text=f"<b>{review_count:,}</b><br>reviews",
@@ -107,56 +132,129 @@ def _build_pie(dim_totals, review_count, title="Dimension Strength"):
     return fig
 
 
-def _build_deviation_bars(dim_totals):
-    """Horizontal bar chart showing each dimension's % vs the ideal 16.7% even split."""
-    grand = sum(dim_totals.values()) or 1
-    ideal = 1.0 / len(DIMENSIONS)
+def _build_entity_pie(dim_scores, review_count, title="Dimension Strength",
+                      pctile_scores=None, breakpoints=None):
+    """Entity pie — shows tier labels (raw mode) or percentile (pctile mode)."""
+    labels = [DIM_LABELS[d] for d in DIMENSIONS]
+    values = [dim_scores.get(d, 0) for d in DIMENSIONS]
+    colors = [DIM_COLORS[d] for d in DIMENSIONS]
 
-    dims_sorted = sorted(DIMENSIONS, key=lambda d: dim_totals.get(d, 0) / grand, reverse=True)
-    labels = [DIM_LABELS[d] for d in dims_sorted]
-    pcts = [dim_totals.get(d, 0) / grand for d in dims_sorted]
-    deviations = [p - ideal for p in pcts]
-    bar_colors = [
-        DIM_COLORS[d] for d in dims_sorted
-    ]
+    if pctile_scores:
+        annotations = [f"{pctile_scores.get(d, 0):.0f}th pctl" for d in DIMENSIONS]
+        hovers = [
+            f"<b>{DIM_LABELS[d]}</b><br>"
+            f"Percentile: {pctile_scores.get(d, 0):.0f}th<br>"
+            f"Tier: {_pctile_tier(pctile_scores.get(d, 0))}<br><br>"
+            f"<i>{DIM_DESCRIPTIONS[d]}</i>"
+            for d in DIMENSIONS
+        ]
+    else:
+        bp = breakpoints or {}
+        annotations = [_score_tier(dim_scores.get(d, 0), bp.get(d))
+                        for d in DIMENSIONS]
+        hovers = [
+            f"<b>{DIM_LABELS[d]}</b><br>"
+            f"Similarity: {dim_scores.get(d, 0):.3f}<br>"
+            f"Tier: {annotations[i]}<br><br>"
+            f"<i>{DIM_DESCRIPTIONS[d]}</i>"
+            for i, d in enumerate(DIMENSIONS)
+        ]
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=labels,
-        x=[dev * 100 for dev in deviations],
-        orientation="h",
-        marker=dict(color=bar_colors),
-        text=[f"{p:.1%}" for p in pcts],
+    fig = go.Figure(data=[go.Pie(
+        labels=labels, values=values,
+        marker=dict(colors=colors, line=dict(color="white", width=2)),
+        pull=[0.05] * len(DIMENSIONS),
+        textinfo="label+text", text=annotations,
         textposition="outside",
-        textfont=dict(size=11, family=FONT_FAMILY, color=COLORS["ink"]),
-        hovertemplate=(
-            "<b>%{y}</b><br>"
-            "Actual: %{text}<br>"
-            f"Ideal: {ideal:.1%}<br>"
-            "Deviation: %{x:+.1f}pp"
-            "<extra></extra>"
-        ),
-    ))
-    fig.add_vline(x=0, line_width=1, line_dash="dot", line_color=COLORS["gray"])
+        textfont=dict(size=13, family=FONT_FAMILY, color=COLORS["ink"]),
+        hovertext=hovers, hoverinfo="text",
+        hole=0.35, sort=False,
+    )])
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
-        xaxis=dict(
-            title="Deviation from even split (pp)",
-            titlefont=dict(size=11),
-            ticksuffix="pp",
-            zeroline=True,
-            gridcolor=COLORS["border"],
-        ),
+        showlegend=False,
+        margin=dict(l=40, r=40, t=50, b=20), height=480,
+        paper_bgcolor="white", plot_bgcolor="white",
+        title=dict(text=title, font=dict(size=16, color=COLORS["navy"]), x=0.5),
+        annotations=[dict(
+            text=f"<b>{review_count:,}</b><br>reviews",
+            x=0.5, y=0.5, font_size=14, showarrow=False,
+            font=dict(family=FONT_FAMILY, color=COLORS["gray"]),
+        )],
+    )
+    return fig
+
+
+def _build_profile_bars(dim_scores, pctile_scores=None, breakpoints=None):
+    """Dimension Profile — descriptive bar chart of scores with tier labels."""
+    if pctile_scores:
+        dims_sorted = sorted(DIMENSIONS,
+                             key=lambda d: pctile_scores.get(d, 50), reverse=True)
+        labels = [DIM_LABELS[d] for d in dims_sorted]
+        values = [pctile_scores.get(d, 50) for d in dims_sorted]
+        bar_colors = [DIM_COLORS[d] for d in dims_sorted]
+        tiers = [_pctile_tier(v) for v in values]
+        text_labels = [f"{v:.0f}th — {t}" for v, t in zip(values, tiers)]
+        x_title = "Percentile Rank Among Peers"
+        chart_title = "Dimension Profile — Peer Rank"
+        x_range = [0, 115]
+        hovers = [
+            f"<b>{DIM_LABELS[d]}</b><br>"
+            f"Percentile: {pctile_scores.get(d, 50):.0f}th<br>"
+            f"Tier: {_pctile_tier(pctile_scores.get(d, 50))}"
+            for d in dims_sorted
+        ]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=labels, x=values, orientation="h",
+            marker=dict(color=bar_colors),
+            text=text_labels, textposition="outside",
+            textfont=dict(size=11, family=FONT_FAMILY, color=COLORS["ink"]),
+            hovertext=hovers, hoverinfo="text",
+        ))
+        fig.add_vline(x=50, line_width=1, line_dash="dot",
+                      line_color=COLORS["gray"], opacity=0.6,
+                      annotation_text="Peer Median",
+                      annotation_position="top",
+                      annotation_font_size=9,
+                      annotation_font_color=COLORS["gray"])
+    else:
+        bp = breakpoints or {}
+        dims_sorted = sorted(DIMENSIONS,
+                             key=lambda d: dim_scores.get(d, 0), reverse=True)
+        labels = [DIM_LABELS[d] for d in dims_sorted]
+        values = [dim_scores.get(d, 0) for d in dims_sorted]
+        bar_colors = [DIM_COLORS[d] for d in dims_sorted]
+        tiers = [_score_tier(v, bp.get(d)) for v, d in zip(values, dims_sorted)]
+        text_labels = [f"{v:.3f} — {t}" for v, t in zip(values, tiers)]
+        x_title = "Cosine Similarity"
+        chart_title = "Dimension Profile — Review Signal Strength"
+        max_val = max(values) if values else 0.8
+        x_range = [0, max_val * 1.4]
+        hovers = [
+            f"<b>{DIM_LABELS[d]}</b><br>"
+            f"Similarity: {dim_scores.get(d, 0):.3f}<br>"
+            f"Tier: {_score_tier(dim_scores.get(d, 0), bp.get(d))}"
+            for d in dims_sorted
+        ]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=labels, x=values, orientation="h",
+            marker=dict(color=bar_colors),
+            text=text_labels, textposition="outside",
+            textfont=dict(size=11, family=FONT_FAMILY, color=COLORS["ink"]),
+            hovertext=hovers, hoverinfo="text",
+        ))
+
+    fig.update_layout(
+        font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
+        xaxis=dict(title=x_title, titlefont=dict(size=11),
+                   range=x_range, gridcolor=COLORS["border"]),
         yaxis=dict(autorange="reversed"),
-        margin=dict(l=10, r=30, t=30, b=40),
-        height=220,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        title=dict(
-            text="Attribute Balance vs Even Split (16.7% each)",
-            font=dict(size=13, color=COLORS["navy"]),
-            x=0.5,
-        ),
+        margin=dict(l=10, r=40, t=30, b=40), height=240,
+        paper_bgcolor="white", plot_bgcolor="white",
+        title=dict(text=chart_title,
+                   font=dict(size=13, color=COLORS["navy"]), x=0.5),
     )
     return fig
 
@@ -170,31 +268,34 @@ def _build_radar_figure(scores, title="Dimension Scores"):
 
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
-        r=values_closed,
-        theta=labels_closed,
+        r=values_closed, theta=labels_closed,
         fill="toself",
         line=dict(color=COLORS["blue"], width=2),
         fillcolor="rgba(0, 76, 140, 0.08)",
-        hoverinfo="skip",
-        showlegend=False,
+        hoverinfo="skip", showlegend=False,
     ))
     for i, d in enumerate(DIMENSIONS):
+        tier = _score_tier(values[i])
         fig.add_trace(go.Scatterpolar(
-            r=[values[i]],
-            theta=[labels[i]],
+            r=[values[i]], theta=[labels[i]],
             mode="markers+text",
             marker=dict(color=colors_list[i], size=10, symbol="circle"),
-            text=[f"{values[i]:.0%}"],
+            text=[f"{values[i]:.2f} ({tier})"],
             textposition="top center",
-            textfont=dict(size=11, color=colors_list[i], family=FONT_FAMILY),
-            hovertemplate=f"<b>{DIM_LABELS[d]}</b>: {values[i]:.0%}<extra></extra>",
+            textfont=dict(size=10, color=colors_list[i], family=FONT_FAMILY),
+            hovertemplate=(
+                f"<b>{DIM_LABELS[d]}</b><br>"
+                f"Cosine Similarity: {values[i]:.3f}<br>"
+                f"Tier: {tier}<extra></extra>"
+            ),
             showlegend=False,
         ))
 
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1],
+            radialaxis=dict(visible=True, range=[0, 0.8],
+                            title=dict(text="Cosine Similarity", font=dict(size=10)),
                             gridcolor=COLORS["border"],
                             linecolor=COLORS["border"]),
             angularaxis=dict(gridcolor=COLORS["border"],
@@ -204,10 +305,8 @@ def _build_radar_figure(scores, title="Dimension Scores"):
         ),
         showlegend=False,
         title=dict(text=title, font=dict(size=14, color=COLORS["ink"])),
-        margin=dict(l=60, r=60, t=50, b=40),
-        height=400,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
+        margin=dict(l=60, r=60, t=50, b=40), height=400,
+        paper_bgcolor="white", plot_bgcolor="white",
     )
     return fig
 
@@ -284,6 +383,7 @@ def layout():
             dcc.Store(id="dna-graph-data", data=[]),
             dcc.Store(id="dna-entity-reviews-store", data=[]),
             dcc.Store(id="dna-selected-dim", data=None),
+            dcc.Store(id="dna-display-mode", data="raw"),
 
             html.H2("Advisor DNA", style={
                 "marginBottom": "4px", "color": COLORS["navy"],
@@ -341,6 +441,39 @@ def layout():
                 id="dna-entity-section",
                 style=_HIDE,
                 children=[
+                    # Display mode toggle + reference card
+                    html.Div(
+                        style={"display": "flex", "justifyContent": "space-between",
+                               "alignItems": "center", "marginBottom": "12px",
+                               "flexWrap": "wrap", "gap": "8px"},
+                        children=[
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "8px"},
+                                children=[
+                                    html.Span("Display:", style={
+                                        "fontSize": "12px", "color": COLORS["gray"],
+                                        "fontWeight": "600"}),
+                                    dcc.RadioItems(
+                                        id="dna-display-toggle",
+                                        options=[
+                                            {"label": "Raw Similarity", "value": "raw"},
+                                            {"label": "Percentile Rank", "value": "percentile"},
+                                        ],
+                                        value="raw", inline=True,
+                                        labelStyle={"fontSize": "12px",
+                                                    "marginRight": "12px"},
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        id="dna-ref-card",
+                        children=[
+                            html.Div(id="dna-ref-card-content"),
+                        ],
+                    ),
                     dcc.Graph(
                         id="dna-entity-chart",
                         figure=go.Figure(),
@@ -455,6 +588,66 @@ def layout():
 # Main view callback — switches between macro / firm / advisor
 # ---------------------------------------------------------------------------
 
+_REF_STYLE = {**_PANEL_STYLE, "marginBottom": "12px", "padding": "14px 18px"}
+
+_RAW_REF_CONTENT = html.Div([
+    html.Div("How to Read These Scores", style={
+        "fontWeight": "700", "fontSize": "13px",
+        "marginBottom": "6px", "color": COLORS["navy"]}),
+    html.Div("Tiers are based on how this entity's scores compare to peers "
+             "using the selected scoring method (quartile breakpoints):",
+             style={"fontSize": "11px", "color": COLORS["gray"],
+                    "marginBottom": "8px"}),
+    html.Ul([
+        html.Li("Very Strong \u2014 top 25% among peers"),
+        html.Li("Strong \u2014 above peer median"),
+        html.Li("Above Average \u2014 below peer median, above 25th percentile"),
+        html.Li("Average \u2014 bottom 25% among peers"),
+    ], style={"fontSize": "12px", "margin": "0", "paddingLeft": "20px",
+              "lineHeight": "1.8", "color": COLORS["ink"]}),
+    html.Div(
+        "Scores reflect how closely client review language aligns with each "
+        "dimension\u2019s ideal description. A lower score doesn\u2019t mean a "
+        "negative review \u2014 it means that particular theme wasn\u2019t as "
+        "prominent in the review text.",
+        style={"fontSize": "11px", "color": COLORS["gray"], "marginTop": "8px",
+               "fontStyle": "italic"}),
+], style=_REF_STYLE)
+
+_PCTILE_REF_CONTENT = html.Div([
+    html.Div("How to Read These Scores", style={
+        "fontWeight": "700", "fontSize": "13px",
+        "marginBottom": "6px", "color": COLORS["navy"]}),
+    html.Div("Compares this entity to all peers of the same type "
+             "(firms vs firms, advisors vs advisors):",
+             style={"fontSize": "11px", "color": COLORS["gray"],
+                    "marginBottom": "8px"}),
+    html.Ul([
+        html.Li("Very Strong \u2014 75th percentile or above (top quarter of peers)"),
+        html.Li("Strong \u2014 50th\u201375th percentile (above peer median)"),
+        html.Li("Above Average \u2014 25th\u201350th percentile"),
+        html.Li("Average \u2014 below 25th percentile"),
+    ], style={"fontSize": "12px", "margin": "0", "paddingLeft": "20px",
+              "lineHeight": "1.8", "color": COLORS["ink"]}),
+    html.Div(
+        "Percentile rank shows where this entity falls relative to peers. "
+        "The bar chart marks the peer median (50th percentile) for reference.",
+        style={"fontSize": "11px", "color": COLORS["gray"], "marginTop": "8px",
+               "fontStyle": "italic"}),
+], style=_REF_STYLE)
+
+
+@callback(
+    Output("dna-ref-card-content", "children"),
+    Output("dna-display-mode", "data"),
+    Input("dna-display-toggle", "value"),
+)
+def update_ref_card_and_mode(display_mode):
+    display_mode = display_mode or "raw"
+    content = _PCTILE_REF_CONTENT if display_mode == "percentile" else _RAW_REF_CONTENT
+    return content, display_mode
+
+
 @callback(
     Output("dna-macro-section", "style"),
     Output("dna-macro-chart", "figure"),
@@ -471,11 +664,14 @@ def layout():
     Input("dna-current-view", "data"),
     Input("dna-entity-search", "value"),
     Input("dna-method-selector", "value"),
+    Input("dna-display-toggle", "value"),
     State("dna-entity-type", "value"),
     prevent_initial_call="initial_duplicate",
 )
-def update_main_view(current_view, entity_id, method, entity_type):
+def update_main_view(current_view, entity_id, method, display_mode, entity_type):
     empty_fig = go.Figure()
+    method = method or "mean"
+    display_mode = display_mode or "raw"
 
     if entity_id:
         reviews = get_dna_entity_reviews(entity_id)
@@ -486,22 +682,35 @@ def update_main_view(current_view, entity_id, method, entity_type):
 
         name = reviews[0].get("advisor_name", entity_id)
         kind = "Firm" if entity_type == "firm" else "Advisor"
-        method_label = (method or "mean").capitalize()
+        method_label = method.capitalize()
 
-        agg = get_dna_advisor_scores(entity_id, method or "mean")
+        agg = get_dna_advisor_scores(entity_id, method)
         if agg and "scores" in agg:
-            dim_totals = {d: agg["scores"].get(d, 0) for d in DIMENSIONS}
+            dim_scores = {d: agg["scores"].get(d, 0) for d in DIMENSIONS}
         else:
-            dim_totals = {d: sum(r.get(f"sim_{d}", 0) or 0 for r in reviews)
+            dim_scores = {d: sum(r.get(f"sim_{d}", 0) or 0 for r in reviews)
                           for d in DIMENSIONS}
 
-        title = f"{name} \u2014 {method_label} Scores"
-        pie = _build_pie(dim_totals, len(reviews), title=title)
-        dev_bars = _build_deviation_bars(dim_totals)
+        pctile_data = None
+        bp_data = None
+        et = entity_type or "firm"
+        if display_mode == "percentile":
+            pctile_resp = get_dna_percentile_scores(entity_id, method)
+            if pctile_resp and "scores" in pctile_resp:
+                pctile_data = pctile_resp["scores"]
+            title = f"{name} \u2014 {method_label} (Percentile Rank)"
+        else:
+            bp_data = get_dna_method_breakpoints(method, et)
+            title = f"{name} \u2014 {method_label} Scores"
+
+        pie = _build_entity_pie(dim_scores, len(reviews), title=title,
+                                pctile_scores=pctile_data, breakpoints=bp_data)
+        profile_bars = _build_profile_bars(dim_scores, pctile_scores=pctile_data,
+                                           breakpoints=bp_data)
 
         return (
             _HIDE, empty_fig,
-            _SHOW, pie, dev_bars,
+            _SHOW, pie, profile_bars,
             f"{kind} View \u2014 {name} ({len(reviews)} reviews, {method_label})",
             reviews,
             _HIDE, _HIDE, [], None, _HIDE,
@@ -515,7 +724,8 @@ def update_main_view(current_view, entity_id, method, entity_type):
     raw_totals = macro_data["totals"]
     review_count = macro_data.get("review_count", 0)
     dim_totals = {d: raw_totals.get(f"sim_{d}", 0) for d in DIMENSIONS}
-    pie = _build_pie(dim_totals, review_count, title="Dimension Strength Across All Reviews")
+    pie = _build_macro_pie(dim_totals, review_count,
+                           title="Dimension Strength Across All Reviews")
 
     return (
         _SHOW, pie,
@@ -633,11 +843,12 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
     options = []
     for i, r in enumerate(sorted_reviews):
         score = r.get(sim_col, 0) or 0
+        tier = _score_tier(score)
         reviewer = r.get("reviewer_name", "") or "Anonymous"
         review_date = r.get("review_date", "") or ""
         date_str = str(review_date).split("T")[0].split(" ")[0] if review_date else ""
         label_text = (
-            f"{DIM_LABELS[dim_key]} \u2014 {score:.0%} \u2014 "
+            f"{DIM_LABELS[dim_key]} \u2014 {tier} ({score:.2f}) \u2014 "
             f"{reviewer} \u2014 {date_str}"
         )
         options.append({"label": label_text, "value": r.get("review_idx", i)})

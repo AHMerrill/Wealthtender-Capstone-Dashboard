@@ -113,6 +113,21 @@ def get_dna_advisor_scores(entity_id: str, method: str = "mean") -> dict:
                 params={"entity_id": entity_id, "method": method}) or {}
 
 
+def get_dna_percentile_scores(entity_id: str, method: str = "mean") -> dict:
+    return _get("/api/advisor-dna/percentile-scores",
+                params={"entity_id": entity_id, "method": method}) or {}
+
+
+def get_dna_population_medians(method: str = "mean", entity_type: str = "firm") -> dict:
+    return _get("/api/advisor-dna/population-medians",
+                params={"method": method, "entity_type": entity_type}) or {}
+
+
+def get_dna_method_breakpoints(method: str = "mean", entity_type: str = "firm") -> dict:
+    return _get("/api/advisor-dna/method-breakpoints",
+                params={"method": method, "entity_type": entity_type}) or {}
+
+
 def get_dna_review_detail(review_idx: int) -> dict:
     return _get(f"/api/advisor-dna/review/{review_idx}") or {}
 
