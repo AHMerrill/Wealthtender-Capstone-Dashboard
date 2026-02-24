@@ -533,6 +533,7 @@ class ArtifactStore:
         base_kwargs = {
             "scope": kwargs.get("scope"),
             "firm_id": kwargs.get("firm_id"),
+            "advisor_id": kwargs.get("advisor_id"),
         }
         base_df = self._apply_eda_filters(**base_kwargs)
         filtered_df = self._apply_eda_filters(**kwargs)
@@ -549,7 +550,10 @@ class ArtifactStore:
     def _apply_eda_filters(self, **kwargs) -> pd.DataFrame:
         df = self.macro_reviews_clean.copy()
 
-        if kwargs.get("scope") == "firm" and self.has_firms:
+        advisor_id = kwargs.get("advisor_id")
+        if advisor_id and "advisor_id" in df.columns:
+            df = df[df["advisor_id"] == advisor_id]
+        elif kwargs.get("scope") == "firm" and self.has_firms:
             firm_id = kwargs.get("firm_id")
             if firm_id and "firm_id" in df.columns:
                 df = df[df["firm_id"] == firm_id]
@@ -586,12 +590,25 @@ class ArtifactStore:
     # EDA helpers
     # ----------------------------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_payload(obj):
+        """Replace NaN/inf with None so JSON serialization doesn't fail."""
+        if isinstance(obj, dict):
+            return {k: ArtifactStore._sanitize_payload(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [ArtifactStore._sanitize_payload(v) for v in obj]
+        if isinstance(obj, float):
+            import math
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+        return obj
+
     def _eda_payload_from_df(self, df: pd.DataFrame, lexical_top_n: int,
                              preset: Optional[str] = None,
                              lexical_n: int = 1,
                              exclude_stopwords: bool = False,
                              custom_stopwords: Optional[List[str]] = None) -> Dict[str, Any]:
-        return {
+        payload = {
             "summary": self._eda_summary(df, preset),
             "quality": self._eda_quality(df, preset),
             "coverage": self._eda_coverage(df, preset),
@@ -604,6 +621,7 @@ class ArtifactStore:
                                          exclude_stopwords, custom_stopwords),
             "meta": self._eda_meta(df),
         }
+        return self._sanitize_payload(payload)
 
     def _eda_meta(self, df: pd.DataFrame) -> Dict[str, Any]:
         if df.empty or "review_date" not in df.columns:
@@ -725,7 +743,7 @@ class ArtifactStore:
     def _eda_reviews_over_time(self, df: pd.DataFrame) -> List[Dict]:
         if df.empty or "review_date" not in df.columns:
             return []
-        series = df.dropna(subset=["review_date"]).set_index("review_date").resample("ME").size()
+        series = df.dropna(subset=["review_date"]).set_index("review_date").resample("M").size()
         return [{"period": idx.strftime("%Y-%m"), "count": int(val)} for idx, val in series.items()]
 
     def _eda_reviews_per_advisor(self, df: pd.DataFrame) -> Dict[str, Any]:

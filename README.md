@@ -1,31 +1,63 @@
 # Wealthtender Capstone Dashboard
 
-A two-service analytics dashboard built for the UT Austin MSBA 2026 Capstone with Wealthtender.
+A two-service analytics dashboard built for the UT Austin MSBA 2026 Capstone with Wealthtender. Analyzes financial advisor client reviews using NLP-derived similarity scoring, interactive visualizations, and role-based access control.
 
-- **API** (`api/`) — FastAPI backend that serves normalized review data from pre-built artifacts.
-- **Dashboard** (`dashboard/`) — Plotly Dash frontend with EDA charts, firm/advisor views, and role-based access.
+- **API** (`api/`) — FastAPI backend that serves normalized review data and advisor-dimension similarity scores from pre-built artifacts.
+- **Dashboard** (`dashboard/`) — Plotly Dash frontend with Advisor DNA analysis, EDA charts, benchmarks, and role-based access.
 
 ---
 
 ## Table of Contents
 
-1. [Getting Access (SSH Setup)](#1-getting-access-ssh-setup)
-2. [Cloning the Repo](#2-cloning-the-repo)
-3. [Running Locally](#3-running-locally)
-4. [Making Changes](#4-making-changes)
-5. [Project Structure](#5-project-structure)
-6. [Environment Variables](#6-environment-variables)
-7. [Docker Compose (Alternative)](#7-docker-compose-alternative)
-8. [Deployment](#8-deployment)
-9. [Auth & Security](#9-auth--security)
-10. [Production Handoff](#10-production-handoff)
-11. [EDA Artifacts](#11-eda-artifacts)
+1. [Features Overview](#1-features-overview)
+2. [Getting Access (SSH Setup)](#2-getting-access-ssh-setup)
+3. [Cloning the Repo](#3-cloning-the-repo)
+4. [Running Locally](#4-running-locally)
+5. [Making Changes](#5-making-changes)
+6. [Project Structure](#6-project-structure)
+7. [Dashboard Pages](#7-dashboard-pages)
+8. [API Endpoints](#8-api-endpoints)
+9. [Artifacts & Data Pipeline](#9-artifacts--data-pipeline)
+10. [Environment Variables](#10-environment-variables)
+11. [Docker Compose (Alternative)](#11-docker-compose-alternative)
+12. [Deployment](#12-deployment)
+13. [Auth & Security](#13-auth--security)
+14. [Production Handoff](#14-production-handoff)
+15. [Tech Stack & Versions](#15-tech-stack--versions)
 
 ---
 
-## 1. Getting Access (SSH Setup)
+## 1. Features Overview
 
-This is a private repo. Once you're added as a collaborator, you'll need an SSH key to clone and push. If you already have SSH keys set up with GitHub, skip to [Cloning the Repo](#2-cloning-the-repo).
+### Advisor DNA
+
+Interactive analysis of advisor-dimension similarity scores derived from client reviews. Uses sentence-transformer embeddings to compute cosine similarity between each review and six quality dimensions (Trust & Integrity, Listening & Personalization, Communication Clarity, Responsiveness, Life Event Support, Investment Expertise).
+
+- **Macro view** — 3D exploded pie chart showing dimension distribution across all reviews
+- **Firm / Advisor view** — Entity-specific pie chart with Dimension Profile bars, tier labels (Very Strong / Strong / Moderate / Foundational), and selectable scoring methods (Mean, Penalized, Weighted)
+- **Review drill-down** — Click a pie wedge to see associated reviews ranked by score, then click a review for full text alongside a spider/radar chart
+- **Display modes** — Toggle between Raw Similarity and Percentile Rank views
+- **Method-specific tiering** — Tier breakpoints are computed per scoring method from entity-level distributions
+
+### EDA (Exploratory Data Analysis)
+
+- Review volume over time, rating distributions, token counts, n-gram analysis
+- Searchable firm/advisor dropdown with "Return to Global" reset
+- Date range filter with "Use Max Range" button
+- Rating, token count, and review count filters
+- Stopword exclusion with custom stopword input
+
+### Other Pages
+
+- **Benchmarks** — Industry benchmark comparisons
+- **Methodology** — Documentation of analytical methods
+- **Home (Splash)** — Role selection portal with admin password and firm access
+
+---
+
+## 2. Getting Access (SSH Setup)
+
+This is a private repo. Once you're added as a collaborator, you'll need an SSH key to clone and push. If you already have SSH keys set up with GitHub, skip to [Cloning the Repo](#3-cloning-the-repo).
 
 ### Step 1: Check for an existing SSH key
 
@@ -42,8 +74,6 @@ Test-Path "$HOME\.ssh\id_ed25519.pub"
 If a file path prints (or `True` on Windows), you already have a key — skip to Step 3.
 
 ### Step 2: Generate a new SSH key
-
-This command works on all platforms (macOS, Linux, and Windows 10+):
 
 ```bash
 ssh-keygen -t ed25519 -C "your_email@example.com"
@@ -78,8 +108,6 @@ Get-Content "$HOME\.ssh\id_ed25519.pub" | Set-Clipboard
 
 ### Step 5: Test the connection
 
-Run this on any platform:
-
 ```bash
 ssh -T git@github.com
 ```
@@ -88,7 +116,7 @@ You should see: `Hi <username>! You've successfully authenticated...`
 
 ---
 
-## 2. Cloning the Repo
+## 3. Cloning the Repo
 
 ### First time (macOS / Linux)
 
@@ -122,7 +150,7 @@ git pull
 
 ---
 
-## 3. Running Locally
+## 4. Running Locally
 
 **Requirements:** Python 3.9 or newer (3.11 or 3.12 preferred). The launcher finds the best version automatically.
 
@@ -148,7 +176,7 @@ The first run creates a virtual environment and installs dependencies (takes abo
 
 ---
 
-## 4. Making Changes
+## 5. Making Changes
 
 ```bash
 # 1. Pull the latest before you start
@@ -167,47 +195,204 @@ If Render is connected, pushing to `main` triggers an automatic redeploy.
 
 ---
 
-## 5. Project Structure
+## 6. Project Structure
 
 ```
-api/                  FastAPI backend — reads artifacts, exposes REST endpoints
-  main.py             All API routes
-  services/           Data loading and processing logic
-dashboard/            Plotly Dash frontend
-  app.py              Main layout, navigation, and core callbacks
-  components/         Page content builders (EDA, firm view, etc.)
-  plots/              Chart generation (Plotly figures)
-  pages/              Dash page registrations (splash, EDA, firm)
-  services/           HTTP client for the API, branding, roles
-artifacts/            Pre-built data artifacts from the EDA pipeline
-  macro_insights/     Reviews, lexical data, quality reports
-data_contract/        Schema expectations for artifacts
-run.sh                Local dev launcher (macOS/Linux)
-run.ps1               Local dev launcher (Windows)
-docker-compose.yml    Local Docker setup (alternative to run.sh)
-Dockerfile.api        Container image for the API
-Dockerfile.dashboard  Container image for the dashboard
-render.yaml           Render deployment blueprint
+api/                          FastAPI backend
+  main.py                     All API routes
+  services/
+    artifacts.py              ArtifactStore — data loading, scoring, filtering
+
+dashboard/                    Plotly Dash frontend
+  app.py                      Main layout, sidebar, navigation, core callbacks
+  branding.py                 Colors, fonts, and global CSS (from Brandbook)
+  roles.py                    Role-based access configuration
+  components/
+    eda_content.py             EDA page charts and callback logic
+  pages/
+    splash.py                  Login / role selection page
+    advisor_dna.py             Advisor DNA page — pie charts, profile bars, drill-down
+    eda.py                     EDA page registration
+    benchmarks.py              Benchmarks page
+    methodology.py             Methodology page
+  plots/
+    eda_charts.py              EDA Plotly chart builders
+  services/
+    api.py                     HTTP client for the FastAPI backend
+    brand.py                   Brand asset loader
+
+artifacts/                    Pre-built data artifacts
+  macro_insights/              EDA artifacts (reviews, lexical, quality)
+  scoring/
+    review_dimension_scores.csv    Per-review cosine similarity scores (6 dimensions)
+    advisor_dimension_scores.csv   Aggregated entity-level scores (mean, penalized, weighted)
+  metadata.json                Artifact manifest
+
+notebooks/
+  collaborator/                Scoring notebook (generates scoring artifacts)
+
+Brandbook/                    Brand guidelines and assets
+data_contract/                Schema expectations for artifacts
+run.sh                        Local dev launcher (macOS/Linux)
+run.ps1                       Local dev launcher (Windows)
+docker-compose.yml            Local Docker setup (alternative to run.sh)
+Dockerfile.api                Container image for the API
+Dockerfile.dashboard          Container image for the dashboard
+render.yaml                   Render deployment blueprint
+requirements.txt              Python dependencies (pinned for production)
 ```
 
 ---
 
-## 6. Environment Variables
+## 7. Dashboard Pages
+
+### Home (`/`)
+Role selection splash page. Admin users enter a password; firm users select their firm. This is the default landing page on login and refresh.
+
+### Advisor DNA (`/advisor-dna`)
+Core analytical page for advisor-dimension similarity analysis.
+
+**Sidebar controls:**
+- Entity type toggle (Firm / Advisor)
+- Searchable entity dropdown
+- Scoring method selector (Mean / Penalized / Weighted) with info tooltip and expandable "Read more" panel
+- Display mode toggle (Raw Similarity / Percentile Rank)
+- Reset to Macro View button
+
+**Views:**
+- **Macro** — 3D exploded pie of dimension totals across all 4,579 reviews, with clickable dimension description cards
+- **Entity** — 3D exploded pie for the selected firm/advisor, Dimension Profile horizontal bar chart with tier labels, clickable wedges to drill into reviews
+- **Review** — Full review text with reviewer name, date, and spider chart showing per-dimension scores
+
+**Scoring methods:**
+- **Mean** — Average cosine similarity across all reviews for the entity
+- **Penalized** — Mean with a consistency penalty (high variance lowers the score)
+- **Weighted** — Time-weighted mean giving more recent reviews higher weight
+
+**Tier labels** (applied from method-specific percentile breakpoints):
+- Very Strong (≥75th percentile)
+- Strong (50th–75th)
+- Moderate (25th–50th)
+- Foundational (<25th)
+
+### EDA (`/eda`)
+Exploratory data analysis of the review corpus.
+
+**Sidebar controls:**
+- Entity type toggle (Firm / Advisor) with searchable dropdown
+- "Return to Global" button to reset to full dataset
+- Date range picker with "Use Max Range" reset button
+- Rating, token count, review count, and n-gram filters
+- Stopword controls
+
+**Charts:** Review volume over time, rating distribution, reviews per advisor, token count distribution, rating vs. token scatter, top n-grams.
+
+### Benchmarks (`/benchmarks`)
+Industry benchmark comparisons. Available to both admin and firm roles.
+
+### Methodology (`/methodology`)
+Documentation of analytical methods used in the dashboard. Admin-only.
+
+---
+
+## 8. API Endpoints
+
+All endpoints are prefixed with `/api/`. Authentication via `X-API-Key` header (see [Auth & Security](#13-auth--security)).
+
+### Core
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check (always open) |
+| `GET /api/metadata/latest` | Artifact metadata and timestamps |
+| `GET /api/stopwords` | Default stopword list for EDA |
+
+### EDA
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/eda/charts` | All EDA chart data. Accepts `scope`, `firm_id`, `advisor_id`, `date_start`, `date_end`, `min_rating`, `token_cat`, `review_cat`, `ngram_n`, `ngram_topn`, `exclude_stopwords`, `custom_stopwords` |
+
+### Advisor DNA
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/advisor-dna/macro` | Sampled review-dimension scores for macro view |
+| `GET /api/advisor-dna/macro-totals` | Dimension totals across all reviews |
+| `GET /api/advisor-dna/entities` | List of firms or advisors (`entity_type` param) |
+| `GET /api/advisor-dna/entity-reviews` | Reviews for a specific entity (`advisor_id` param) |
+| `GET /api/advisor-dna/advisor-scores` | Aggregated dimension scores (`advisor_id`, `method` params) |
+| `GET /api/advisor-dna/percentile-scores` | Percentile rank scores within peer group |
+| `GET /api/advisor-dna/population-medians` | Population median scores by method |
+| `GET /api/advisor-dna/method-breakpoints` | Percentile breakpoints for tier labeling (`method`, `entity_type` params) |
+| `GET /api/advisor-dna/review/{review_idx}` | Single review detail by index |
+
+### Firm (Legacy)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/firms` | List of firms |
+| `GET /api/firm/{firm_id}/summary` | Firm summary |
+| `GET /api/firm/{firm_id}/dimensions` | Firm dimension scores |
+| `GET /api/firm/{firm_id}/advisors` | Advisors within a firm |
+| `GET /api/firm/{firm_id}/advisor/{advisor_id}` | Individual advisor detail |
+| `GET /api/firm/{firm_id}/benchmarks` | Firm benchmark data |
+| `GET /api/firm/{firm_id}/personas` | Firm persona clusters |
+| `GET /api/reviews/{review_id}` | Single review by ID |
+
+---
+
+## 9. Artifacts & Data Pipeline
+
+### EDA Artifacts (`artifacts/macro_insights/`)
+
+Pre-built from the EDA notebook. The dashboard reads these on startup.
+
+| File | Purpose |
+|------|---------|
+| `reviews_clean.csv` | Cleaned review data (text, ratings, metadata) |
+| `eda/eda_summary.json` | Summary statistics |
+| `eda/coverage.json` | Data coverage metrics |
+| `quality/quality_summary.json` | Quality report |
+| `quality/raw_file_meta.json` | Raw file metadata |
+| `quality/missing_report.csv` | Missing data report |
+| `lexical/top_tokens.csv` | Top unigram tokens |
+| `lexical/top_bigrams.csv` | Top bigram tokens |
+
+### Scoring Artifacts (`artifacts/scoring/`)
+
+Generated by the collaborator notebook (`notebooks/collaborator/query_embeddings_vs_review_embeddings.ipynb`). This notebook:
+1. Loads pre-computed review embeddings and advisor embeddings
+2. Encodes six dimension query strings using `sentence-transformers`
+3. Computes cosine similarity between each review embedding and each query
+4. Aggregates scores at the entity level using mean, penalized, and weighted methods
+5. Exports two CSV files
+
+| File | Contents |
+|------|----------|
+| `review_dimension_scores.csv` | Per-review similarity scores for 6 dimensions, with review metadata |
+| `advisor_dimension_scores.csv` | Entity-level aggregated scores (mean, penalized, weighted) for each dimension |
+
+To regenerate scoring artifacts, run the notebook end-to-end and copy the outputs to `artifacts/scoring/`.
+
+---
+
+## 10. Environment Variables
 
 All settings have sensible defaults for local development — you don't need to configure anything to run locally.
 
 See `.env.example` for the full list. On Render, set these in each service's **Environment** tab.
 
-| Variable         | Default                 | Set On      | What It Does                                           |
-|------------------|-------------------------|-------------|--------------------------------------------------------|
-| `API_BASE`       | `http://localhost:8000` | Dashboard   | URL the dashboard uses to reach the API                |
-| `PORT`           | `8050` / `8000`         | Both        | Listening port (Render injects this automatically)     |
-| `API_KEY`        | *(empty — auth off)*    | Both        | Shared secret between services (see [Auth](#9-auth--security)) |
-| `ADMIN_PASSWORD` | `WT$msba2026`           | Dashboard   | Password for the admin portal on the splash page       |
+| Variable | Default | Set On | What It Does |
+|----------|---------|--------|--------------|
+| `API_BASE` | `http://localhost:8000` | Dashboard | URL the dashboard uses to reach the API |
+| `PORT` | `8050` / `8000` | Both | Listening port (Render injects this automatically) |
+| `API_KEY` | *(empty — auth off)* | Both | Shared secret between services (see [Auth](#13-auth--security)) |
+| `ADMIN_PASSWORD` | `WT$msba2026` | Dashboard | Password for the admin portal on the splash page |
 
 ---
 
-## 7. Docker Compose (Alternative)
+## 11. Docker Compose (Alternative)
 
 If you prefer Docker over the `run.sh` script:
 
@@ -221,7 +406,7 @@ Dashboard at http://localhost:8050, API at http://localhost:8000.
 
 ---
 
-## 8. Deployment
+## 12. Deployment
 
 Both services are containerized and can deploy to any Docker-compatible host (Render, Railway, Fly.io, AWS ECS, GCP Cloud Run, etc.).
 
@@ -251,7 +436,7 @@ If you need to rotate the API key or change the admin password, update the value
 
 ---
 
-## 9. Auth & Security
+## 13. Auth & Security
 
 There are two layers of authentication:
 
@@ -269,7 +454,7 @@ The admin portal on the splash page requires a password before granting access. 
 
 ---
 
-## 10. Production Handoff
+## 14. Production Handoff
 
 When handing this project to Wealthtender's engineering team, here's a roadmap for upgrading auth:
 
@@ -292,19 +477,31 @@ When handing this project to Wealthtender's engineering team, here's a roadmap f
 
 ---
 
-## 11. EDA Artifacts
+## 15. Tech Stack & Versions
 
-The EDA page renders from pre-built files in `artifacts/macro_insights/`:
+### Production Dependencies (`requirements.txt`)
 
-| File | Purpose |
-|------|---------|
-| `reviews_clean.csv` | Cleaned review data |
-| `eda/eda_summary.json` | Summary statistics |
-| `eda/coverage.json` | Data coverage metrics |
-| `quality/quality_summary.json` | Quality report |
-| `quality/raw_file_meta.json` | Raw file metadata |
-| `quality/missing_report.csv` | Missing data report |
-| `lexical/top_tokens.csv` | Top unigram tokens |
-| `lexical/top_bigrams.csv` | Top bigram tokens |
+| Package | Version | Role |
+|---------|---------|------|
+| `dash` | 2.16.1 | Frontend framework (Plotly Dash) |
+| `plotly` | 5.20.0 | Chart library (pie, bar, radar/spider charts) |
+| `fastapi` | 0.119.0 | Backend API framework |
+| `uvicorn` | 0.29.0 | ASGI server for FastAPI |
+| `pydantic` | 2.11.0 | Data validation for API models |
+| `pandas` | 2.2.2 | Data manipulation and artifact loading |
+| `requests` | 2.31.0 | HTTP client (dashboard to API) |
+| `gunicorn` | ≥21.2.0 | Production WSGI server for Dash |
 
-To update the dashboard with new data, replace these files with fresh exports from the EDA notebook and the dashboard picks them up automatically.
+### Offline / Notebook Dependencies
+
+These are used only for regenerating scoring artifacts, not at runtime:
+
+- `sentence-transformers` — Encodes dimension query strings into embeddings
+- `numpy` — Array operations for cosine similarity
+- `pyarrow` — Parquet file I/O for embedding data
+
+### Infrastructure
+
+- **Containerization:** Docker (multi-stage builds)
+- **Deployment:** Render (via `render.yaml` blueprint)
+- **Local dev:** `run.sh` / `run.ps1` launcher scripts or `docker compose`

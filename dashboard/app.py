@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 
 from dashboard.services.api import (
-    get_firms, get_stopwords, warm_api, is_api_ready, get_dna_entities,
+    get_stopwords, warm_api, is_api_ready, get_dna_entities,
 )
 from dashboard.components.eda_content import eda_content
 from dashboard.branding import ensure_theme_css
@@ -105,6 +105,11 @@ app.layout = html.Div(
         dcc.Location(id="url"),
         dcc.Store(id="user-role", storage_type="session"),
         dcc.Store(id="firm-options-loaded", data=False),
+        dcc.Store(id="eda-scope", data="global"),
+        html.Div(id="firm-dropdown", style={"display": "none"}),
+        html.Div(id="firm-selector-group", style={"display": "none"}),
+        html.Div(id="firm-locked-display", style={"display": "none"}),
+        html.Div(id="firm-locked-name", style={"display": "none"}),
         dcc.Interval(id="api-poll", interval=3_000, max_intervals=40),
 
         # -- Top nav bar --
@@ -150,25 +155,6 @@ app.layout = html.Div(
                         html.Div(id="sidebar-role-badge",
                                  style={"marginBottom": "8px"}),
 
-                        # Firm dropdown (admin) or locked name (firm user)
-                        html.Div(id="firm-selector-group",
-                                 className="filter-group",
-                                 style={"display": "none", "marginTop": "8px"},
-                                 children=[
-                            html.Div("Firm Selector", className="filter-label"),
-                            dcc.Dropdown(id="firm-dropdown",
-                                         placeholder="Select firm",
-                                         searchable=False),
-                        ]),
-                        html.Div(id="firm-locked-display",
-                                 style={"display": "none", "marginTop": "8px"},
-                                 children=[
-                            html.Div("Firm", className="filter-label"),
-                            html.Div(id="firm-locked-name", style={
-                                "fontWeight": "600", "color": "#004C8C",
-                                "fontSize": "14px", "padding": "6px 0"}),
-                        ]),
-
                         # EDA-specific filters
                         html.Div(
                             id="eda-filters-section",
@@ -176,15 +162,43 @@ app.layout = html.Div(
                             style={"display": "none"},
                             children=[
                                 html.Div(className="filter-group", children=[
-                                    html.Div("Scope", className="filter-label"),
+                                    html.Div("Search By", className="filter-label"),
                                     dcc.RadioItems(
-                                        id="eda-scope",
+                                        id="eda-entity-type",
                                         options=[
-                                            {"label": "Global", "value": "global"},
                                             {"label": "Firm", "value": "firm"},
+                                            {"label": "Advisor", "value": "advisor"},
                                         ],
-                                        value="global", inline=False),
+                                        value="firm",
+                                        inline=True,
+                                    ),
                                 ]),
+                                html.Div(className="filter-group",
+                                         style={"marginTop": "8px"}, children=[
+                                    html.Div("Select Entity", className="filter-label"),
+                                    dcc.Dropdown(
+                                        id="eda-entity-search",
+                                        placeholder="Search...",
+                                        searchable=True,
+                                        clearable=True,
+                                    ),
+                                ]),
+                                html.Button(
+                                    "Return to Global",
+                                    id="eda-reset-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "marginTop": "8px",
+                                        "marginBottom": "12px",
+                                        "fontSize": "12px",
+                                        "cursor": "pointer",
+                                        "background": "none",
+                                        "border": "1px solid #ccc",
+                                        "borderRadius": "4px",
+                                        "padding": "6px 12px",
+                                        "width": "100%",
+                                    },
+                                ),
                                 _filter("Rating", dcc.Dropdown(
                                     id="eda-rating-filter",
                                     options=[{"label": "All", "value": "all"}]
@@ -198,13 +212,32 @@ app.layout = html.Div(
                                     multi=True,
                                     clearable=False,
                                     placeholder="Select range...")),
-                                _filter("Date Range", dcc.DatePickerRange(
-                                    id="eda-date-range",
-                                    start_date=None, end_date=None,
-                                    display_format="YYYY-MM-DD",
-                                    start_date_placeholder_text="Start",
-                                    end_date_placeholder_text="End",
-                                    style={"width": "100%"})),
+                                _filter("Date Range", html.Div([
+                                    dcc.DatePickerRange(
+                                        id="eda-date-range",
+                                        start_date=None, end_date=None,
+                                        display_format="YYYY-MM-DD",
+                                        start_date_placeholder_text="Start",
+                                        end_date_placeholder_text="End",
+                                        style={"width": "100%"},
+                                    ),
+                                    html.Button(
+                                        "Use Max Range",
+                                        id="eda-date-max-btn",
+                                        n_clicks=0,
+                                        style={
+                                            "marginTop": "6px",
+                                            "fontSize": "11px",
+                                            "cursor": "pointer",
+                                            "background": "none",
+                                            "color": "#004C8C",
+                                            "border": "none",
+                                            "textDecoration": "underline",
+                                            "fontFamily": "inherit",
+                                            "padding": "0",
+                                        },
+                                    ),
+                                ])),
                                 _filter("Token Count", dcc.Dropdown(
                                     id="eda-token-range",
                                     options=[{"label": "All", "value": "all"}],
@@ -610,44 +643,11 @@ def check_api_status(_n):
     )
 
 
-# ---------- Firm dropdown (loads once) ----------
-
-@callback(
-    Output("firm-dropdown", "options"),
-    Output("firm-dropdown", "value"),
-    Output("firm-options-loaded", "data"),
-    Input("user-role", "data"),
-    State("firm-options-loaded", "data"),
-    State("firm-dropdown", "value"),
-)
-def load_firm_options(user_role_data, already_loaded, cur_value):
-    role, firm_id = _get_role_and_firm(user_role_data)
-    if not role or already_loaded:
-        return no_update, no_update, no_update
-    firms = get_firms()
-    opts = [{"label": f["firm_id"], "value": f["firm_id"]} for f in firms]
-    if not opts:
-        # API unreachable or no firms -- allow retry on next role change
-        opts = [{"label": "No firms available",
-                 "value": "__none__", "disabled": True}]
-        log.info("load_firm_options: no firms (API down?), will retry")
-        return opts, no_update, False
-    if firm_id and any(o["value"] == firm_id for o in opts):
-        default = firm_id
-    else:
-        default = cur_value or (opts[0]["value"] if opts else None)
-    log.info("load_firm_options: %d opts, default=%s", len(opts), default)
-    return opts, default, True
-
-
 # ---------- Sidebar visibility ----------
 
 @callback(
     Output("sidebar", "style"),
     Output("sidebar-role-badge", "children"),
-    Output("firm-selector-group", "style"),
-    Output("firm-locked-display", "style"),
-    Output("firm-locked-name", "children"),
     Output("eda-filters-section", "style"),
     Output("dna-filters-section", "style"),
     Output("sidebar-page-note", "style"),
@@ -660,37 +660,19 @@ def update_sidebar(pathname, user_role_data):
     hide = {"display": "none"}
 
     if not role or pathname == "/":
-        return hide, "", hide, hide, "", hide, hide, hide
+        return hide, "", hide, hide, hide
 
     cfg = get_role_config(role)
     badge = html.Span(
         cfg.get("label", role.title()),
         style={"fontSize": "11px", "color": "#6b7280", "fontStyle": "italic"})
 
-    # Firm picker vs locked (hide on DNA page -- it has its own entity search)
-    if pathname == "/advisor-dna":
-        fg = hide
-        fl = hide
-        fn = ""
-    elif cfg.get("show_firm_picker"):
-        fg = {"display": "block", "marginTop": "8px"}
-        fl = hide
-        fn = ""
-    elif cfg.get("firm_locked") and firm_id:
-        fg = hide
-        fl = {"display": "block", "marginTop": "8px"}
-        fn = firm_id
-    else:
-        fg = hide
-        fl = hide
-        fn = ""
-
     allowed = pages_for_role(role)
     eda = {"display": "block"} if pathname == "/eda" and "/eda" in allowed else hide
     dna = {"display": "block"} if pathname == "/advisor-dna" and "/advisor-dna" in allowed else hide
     note = {"display": "block"} if pathname not in ("/eda", "/advisor-dna") else hide
 
-    return {"display": "block"}, badge, fg, fl, fn, eda, dna, note
+    return {"display": "block"}, badge, eda, dna, note
 
 
 # ---------- Stopword panel: show/hide + load defaults ----------
@@ -832,6 +814,55 @@ def toggle_content(pathname, user_role_data):
     ])
     return {}, hide, hide, {"display": "block", "padding": "40px",
                              "textAlign": "center"}, denied
+
+
+# ---------- EDA sidebar callbacks ----------
+
+@callback(
+    Output("eda-entity-search", "options"),
+    Output("eda-entity-search", "value"),
+    Input("eda-entity-type", "value"),
+    Input("eda-reset-btn", "n_clicks"),
+    Input("url", "pathname"),
+)
+def update_eda_entity_options(entity_type, reset_clicks, pathname):
+    ctx = dash.callback_context
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
+
+    if trigger == "eda-reset-btn":
+        entity_type = entity_type or "firm"
+
+    entity_type = entity_type or "firm"
+    entities = get_dna_entities()
+    if entity_type == "firm":
+        items = entities.get("firms", [])
+    else:
+        items = entities.get("advisors", [])
+
+    max_len = 60
+    options = []
+    for e in items:
+        full_name = e.get("advisor_name", e.get("advisor_id", ""))
+        label = (full_name[:max_len] + "\u2026") if len(full_name) > max_len else full_name
+        options.append({
+            "label": label,
+            "value": e.get("advisor_id", ""),
+            "title": full_name,
+        })
+    options.sort(key=lambda o: o["label"])
+    return options, None
+
+
+@callback(
+    Output("eda-date-range", "start_date", allow_duplicate=True),
+    Output("eda-date-range", "end_date", allow_duplicate=True),
+    Input("eda-date-max-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def reset_date_range_to_max(n_clicks):
+    if not n_clicks:
+        return no_update, no_update
+    return None, None
 
 
 # ---------- Advisor DNA sidebar callbacks ----------

@@ -137,12 +137,11 @@ def sync_review_all(selected):
     Output("eda-token-counts", "figure"),
     Output("eda-rating-vs-token", "figure"),
     Output("eda-top-ngrams", "figure"),
-    Output("eda-date-range", "start_date"),
-    Output("eda-date-range", "end_date"),
+    Output("eda-date-range", "start_date", allow_duplicate=True),
+    Output("eda-date-range", "end_date", allow_duplicate=True),
     Output("eda-token-range", "options"),
     Output("eda-review-range", "options"),
-    Input("eda-scope", "value"),
-    Input("firm-dropdown", "value"),
+    Input("eda-entity-search", "value"),
     Input("eda-date-range", "start_date"),
     Input("eda-date-range", "end_date"),
     Input("eda-rating-filter", "value"),
@@ -156,20 +155,18 @@ def sync_review_all(selected):
     prevent_initial_call=True,
 )
 def update_eda_charts(
-    scope, firm_id, start_date, end_date, rating_value,
+    entity_id, start_date, end_date, rating_value,
     token_cat, review_cat, ngram_size, ngram_topn,
     exclude_stopwords, custom_stopwords, pathname,
 ):
-    # Don't run when EDA page isn't loaded (outputs don't exist yet)
     if pathname != "/eda":
         raise dash.exceptions.PreventUpdate
 
     palette = get_dataviz_palette()
 
-    # -- First, fetch unfiltered data to get quartile breakpoints --
-    base_params = {"scope": scope}
-    if scope == "firm" and firm_id:
-        base_params["firm_id"] = firm_id
+    base_params = {"scope": "global"}
+    if entity_id:
+        base_params["advisor_id"] = entity_id
 
     # -- Build API query params --
     params = dict(base_params)

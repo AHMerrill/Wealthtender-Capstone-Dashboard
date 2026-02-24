@@ -202,6 +202,9 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   padding: 4px 6px;
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 
 .DateRangePickerInput {{
@@ -214,8 +217,8 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
 }}
 
 .DateInput {{
-  width: 100%;
-  flex: 1 1 0;
+  width: auto;
+  flex: 1 1 45%;
   min-width: 0;
 }}
 

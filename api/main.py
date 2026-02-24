@@ -137,6 +137,7 @@ def stopwords():
 def eda_charts(
     scope: Literal["global", "firm"] = "global",
     firm_id: Optional[str] = None,
+    advisor_id: Optional[str] = None,
     date_start: Optional[str] = None,
     date_end: Optional[str] = None,
     rating: Optional[float] = Query(None, ge=0.0, le=5.0),
@@ -150,15 +151,16 @@ def eda_charts(
     custom_stopwords: Optional[List[str]] = Query(None),
     preset: Optional[str] = None,
 ):
-    if scope == "firm" and not firm_id:
+    if scope == "firm" and not firm_id and not advisor_id:
         raise HTTPException(
             status_code=400,
-            detail="firm_id is required when scope is 'firm'",
+            detail="firm_id or advisor_id is required when scope is 'firm'",
         )
 
     payload = store.eda_payload(
         scope=scope,
         firm_id=firm_id,
+        advisor_id=advisor_id,
         date_start=date_start,
         date_end=date_end,
         rating=rating,

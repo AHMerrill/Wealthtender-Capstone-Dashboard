@@ -248,7 +248,7 @@ def _build_profile_bars(dim_scores, pctile_scores=None, breakpoints=None):
 
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
-        xaxis=dict(title=x_title, titlefont=dict(size=11),
+        xaxis=dict(title=dict(text=x_title, font=dict(size=11)),
                    range=x_range, gridcolor=COLORS["border"]),
         yaxis=dict(autorange="reversed"),
         margin=dict(l=10, r=40, t=30, b=40), height=240,
@@ -666,12 +666,25 @@ def update_ref_card_and_mode(display_mode):
     Input("dna-method-selector", "value"),
     Input("dna-display-toggle", "value"),
     State("dna-entity-type", "value"),
-    prevent_initial_call="initial_duplicate",
+    prevent_initial_call=True,
 )
 def update_main_view(current_view, entity_id, method, display_mode, entity_type):
+    import logging
+    log = logging.getLogger(__name__)
     empty_fig = go.Figure()
     method = method or "mean"
     display_mode = display_mode or "raw"
+
+    try:
+        return _update_main_view_inner(entity_id, method, display_mode, entity_type)
+    except Exception:
+        log.exception("update_main_view failed")
+        return (_SHOW, empty_fig, _HIDE, empty_fig, empty_fig,
+                "Error loading view.", [], _HIDE, _HIDE, [], None, _HIDE)
+
+
+def _update_main_view_inner(entity_id, method, display_mode, entity_type):
+    empty_fig = go.Figure()
 
     if entity_id:
         reviews = get_dna_entity_reviews(entity_id)
