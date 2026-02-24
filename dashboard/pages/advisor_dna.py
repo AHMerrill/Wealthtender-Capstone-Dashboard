@@ -602,7 +602,7 @@ _RAW_REF_CONTENT = html.Div([
         html.Li("Very Strong \u2014 top 25% among peers"),
         html.Li("Strong \u2014 above peer median"),
         html.Li("Moderate \u2014 below peer median, above 25th percentile"),
-        html.Li("Average \u2014 bottom 25% among peers"),
+        html.Li("Foundational \u2014 bottom 25% among peers"),
     ], style={"fontSize": "12px", "margin": "0", "paddingLeft": "20px",
               "lineHeight": "1.8", "color": COLORS["ink"]}),
     html.Div(
@@ -626,7 +626,7 @@ _PCTILE_REF_CONTENT = html.Div([
         html.Li("Very Strong \u2014 75th percentile or above (top quarter of peers)"),
         html.Li("Strong \u2014 50th\u201375th percentile (above peer median)"),
         html.Li("Moderate \u2014 25th\u201350th percentile"),
-        html.Li("Average \u2014 below 25th percentile"),
+        html.Li("Foundational \u2014 below 25th percentile"),
     ], style={"fontSize": "12px", "margin": "0", "paddingLeft": "20px",
               "lineHeight": "1.8", "color": COLORS["ink"]}),
     html.Div(
