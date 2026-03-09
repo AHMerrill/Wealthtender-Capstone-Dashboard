@@ -150,6 +150,7 @@ def eda_charts(
     exclude_stopwords: Optional[bool] = False,
     custom_stopwords: Optional[List[str]] = Query(None),
     preset: Optional[str] = None,
+    time_freq: Optional[str] = Query("month", regex="^(month|quarter|year)$"),
 ):
     if scope == "firm" and not firm_id and not advisor_id:
         raise HTTPException(
@@ -173,6 +174,7 @@ def eda_charts(
         exclude_stopwords=exclude_stopwords,
         custom_stopwords=custom_stopwords,
         preset=preset,
+        time_freq=time_freq,
     )
     if not payload:
         raise HTTPException(status_code=404, detail="EDA data not available")

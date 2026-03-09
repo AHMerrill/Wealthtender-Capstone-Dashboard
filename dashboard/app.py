@@ -238,6 +238,14 @@ app.layout = html.Div(
                                         },
                                     ),
                                 ])),
+                                _filter("Time Grouping", dcc.Dropdown(
+                                    id="eda-time-freq",
+                                    options=[
+                                        {"label": "Month", "value": "month"},
+                                        {"label": "Quarter", "value": "quarter"},
+                                        {"label": "Year", "value": "year"},
+                                    ],
+                                    value="quarter", clearable=False)),
                                 _filter("Review Length", dcc.Dropdown(
                                     id="eda-token-range",
                                     options=[{"label": "All", "value": "all"}],

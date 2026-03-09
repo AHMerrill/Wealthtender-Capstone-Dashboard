@@ -543,6 +543,7 @@ class ArtifactStore:
             lexical_n=kwargs.get("lexical_n", 1),
             exclude_stopwords=kwargs.get("exclude_stopwords", False),
             custom_stopwords=kwargs.get("custom_stopwords"),
+            time_freq=kwargs.get("time_freq", "month"),
         )
         payload["meta"] = self._eda_meta(base_df)
         return payload
@@ -607,13 +608,14 @@ class ArtifactStore:
                              preset: Optional[str] = None,
                              lexical_n: int = 1,
                              exclude_stopwords: bool = False,
-                             custom_stopwords: Optional[List[str]] = None) -> Dict[str, Any]:
+                             custom_stopwords: Optional[List[str]] = None,
+                             time_freq: str = "month") -> Dict[str, Any]:
         payload = {
             "summary": self._eda_summary(df, preset),
             "quality": self._eda_quality(df, preset),
             "coverage": self._eda_coverage(df, preset),
             "rating_distribution": self._eda_rating_distribution(df),
-            "reviews_over_time": self._eda_reviews_over_time(df),
+            "reviews_over_time": self._eda_reviews_over_time(df, time_freq),
             "reviews_per_advisor": self._eda_reviews_per_advisor(df),
             "token_counts": self._eda_token_counts(df),
             "rating_vs_token": self._eda_rating_vs_token(df),
@@ -740,11 +742,24 @@ class ArtifactStore:
             for k, v in df["rating"].value_counts(dropna=False).items()
         ]
 
-    def _eda_reviews_over_time(self, df: pd.DataFrame) -> List[Dict]:
+    def _eda_reviews_over_time(self, df: pd.DataFrame,
+                               time_freq: str = "month") -> List[Dict]:
         if df.empty or "review_date" not in df.columns:
             return []
-        series = df.dropna(subset=["review_date"]).set_index("review_date").resample("M").size()
-        return [{"period": idx.strftime("%Y-%m"), "count": int(val)} for idx, val in series.items()]
+        freq_map = {"month": "MS", "quarter": "QS", "year": "YS"}
+        resample_code = freq_map.get(time_freq, "MS")
+        fmt_map = {"month": "%Y-%m", "quarter": "%Y-Q", "year": "%Y"}
+        date_fmt = fmt_map.get(time_freq, "%Y-%m")
+
+        series = df.dropna(subset=["review_date"]).set_index("review_date").resample(resample_code).size()
+        result = []
+        for idx, val in series.items():
+            if time_freq == "quarter":
+                label = f"{idx.year}-Q{(idx.month - 1) // 3 + 1}"
+            else:
+                label = idx.strftime(date_fmt)
+            result.append({"period": label, "count": int(val)})
+        return result
 
     def _eda_reviews_per_advisor(self, df: pd.DataFrame) -> Dict[str, Any]:
         if df.empty or "advisor_id" not in df.columns:

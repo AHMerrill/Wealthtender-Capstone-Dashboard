@@ -151,13 +151,14 @@ def sync_review_all(selected):
     Input("eda-ngram-topn", "value"),
     Input("eda-exclude-stopwords", "value"),
     Input("eda-custom-stopwords", "value"),
+    Input("eda-time-freq", "value"),
     Input("url", "pathname"),
     prevent_initial_call=True,
 )
 def update_eda_charts(
     entity_id, start_date, end_date, rating_value,
     token_cat, review_cat, ngram_size, ngram_topn,
-    exclude_stopwords, custom_stopwords, pathname,
+    exclude_stopwords, custom_stopwords, time_freq, pathname,
 ):
     if pathname != "/eda":
         raise dash.exceptions.PreventUpdate
@@ -191,6 +192,8 @@ def update_eda_charts(
     params["exclude_stopwords"] = bool(exclude_stopwords)
     if exclude_stopwords and custom_stopwords:
         params["custom_stopwords"] = custom_stopwords
+    if time_freq:
+        params["time_freq"] = time_freq
 
     # Normalize multi-select values: dropdown gives a list like ["all"],
     # ["low", "medium"], etc.  Treat empty or ["all"] as no filter.
