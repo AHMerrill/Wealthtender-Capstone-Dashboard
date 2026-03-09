@@ -115,7 +115,7 @@ def token_count_hist(counts: list[int], palette: list[str]) -> go.Figure:
         return _empty_figure("No token data")
 
     fig = go.Figure(data=[go.Histogram(x=counts, marker_color=_pc(palette, 4))])
-    fig.update_layout(xaxis_title="Token count", yaxis_title="Reviews", bargap=0.05)
+    fig.update_layout(xaxis_title="Review Length (words)", yaxis_title="Reviews", bargap=0.05)
     return _apply_base_layout(fig)
 
 
@@ -133,7 +133,7 @@ def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure
                 y=y,
                 mode="markers",
                 customdata=custom,
-                hovertemplate="Tokens: %{x}<br>Rating: %{y}<extra></extra>",
+                hovertemplate="Words: %{x}<br>Rating: %{y}<extra></extra>",
                 marker=dict(
                     color=_pc(palette, 1),
                     size=7,
@@ -143,7 +143,7 @@ def rating_vs_token_scatter(points: list[dict], palette: list[str]) -> go.Figure
             )
         ]
     )
-    fig.update_layout(xaxis_title="Token count", yaxis_title="Rating")
+    fig.update_layout(xaxis_title="Review Length (words)", yaxis_title="Rating")
     return _apply_base_layout(fig)
 
 

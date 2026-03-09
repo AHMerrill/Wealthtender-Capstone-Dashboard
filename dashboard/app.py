@@ -238,7 +238,7 @@ app.layout = html.Div(
                                         },
                                     ),
                                 ])),
-                                _filter("Token Count", dcc.Dropdown(
+                                _filter("Review Length", dcc.Dropdown(
                                     id="eda-token-range",
                                     options=[{"label": "All", "value": "all"}],
                                     value=["all"],

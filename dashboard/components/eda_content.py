@@ -73,9 +73,9 @@ def eda_content():
             _chart_section("Rating Distribution", "eda-rating-dist"),
             _chart_section("Reviews Over Time", "eda-reviews-over-time"),
             _chart_section("Reviews per Advisor", "eda-reviews-per-advisor"),
-            _chart_section("Token Count Distribution", "eda-token-counts"),
+            _chart_section("Review Length Distribution", "eda-token-counts"),
             _chart_section(
-                "Rating vs Token Count",
+                "Rating vs Review Length",
                 "eda-rating-vs-token",
                 extra_children=[
                     html.Div(id="eda-review-detail", className="review-detail-card"),
@@ -236,7 +236,7 @@ def update_eda_charts(
         empty_fig = _empty_figure("Waiting for data...")
         return (
             [_kpi("Reviews", "..."), _kpi("Advisors", "..."),
-             _kpi("Pct < 20 tokens", "..."), _kpi("Pct < 50 tokens", "...")],
+             _kpi("Pct < 20 words", "..."), _kpi("Pct < 50 words", "...")],
             [_kpi("Advisors total", "..."), _kpi("Pct < 3", "..."),
              _kpi("Pct < 5", "..."), _kpi("Pct < 10", "...")],
             [_kpi("Rows", "..."), _kpi("Advisors", "..."),
@@ -256,8 +256,8 @@ def update_eda_charts(
     summary_cards = [
         _kpi("Reviews", _fmt_int(summary.get("reviews"))),
         _kpi("Advisors", _fmt_int(summary.get("advisors"))),
-        _kpi("Pct < 20 tokens", _pct(summary.get("pct_under_20_tokens"))),
-        _kpi("Pct < 50 tokens", _pct(summary.get("pct_under_50_tokens"))),
+        _kpi("Pct < 20 words", _pct(summary.get("pct_under_20_tokens"))),
+        _kpi("Pct < 50 words", _pct(summary.get("pct_under_50_tokens"))),
     ]
     coverage_cards = [
         _kpi("Advisors total", _fmt_int(coverage.get("advisors_total"))),
@@ -390,7 +390,7 @@ def _review_card(detail: dict):
     if rating is not None:
         meta_bits.append(f"Rating: {rating}")
     if token_count is not None:
-        meta_bits.append(f"Tokens: {token_count}")
+        meta_bits.append(f"Words: {token_count}")
     children = [
         html.Div(title, className="review-detail-title"),
         html.Div(" \u2022 ".join(meta_bits), className="review-detail-meta"),
