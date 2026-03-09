@@ -45,20 +45,20 @@
 | FB-09 | Macro view: Comparison Pool (All/Premier) + Bar/Spider toggle | DONE |
 | FB-10 | Review evidence per dimension ("Why this score?") | DONE |
 
-### Sprint 3 — Benchmarks, Leaderboard & Comparisons (Current)
+### Sprint 3 — Benchmarks, Leaderboard & Comparisons ✅
 
 **Three new tabs**, each with a focused purpose:
 
 | Item | Tab | Description | Status |
 |------|-----|------------|--------|
-| FB-11 | **Benchmarks** | Premier pool deep-dive: composition stats, dimension distributions, P25/P50/P75 breakpoints, advisor vs firm profiles | PLANNED |
-| FB-12 | **Benchmarks** | Population distribution charts: where entities fall on each dimension, "you are here" marker | PLANNED |
-| FB-13 | **Benchmarks** | Peer percentile summary card: selected entity's scores vs benchmark breakpoints | PLANNED |
-| FB-14 | **Leaderboard** | Dimension leaderboard: top-N entities per dimension, filterable by type and pool | PLANNED |
-| FB-15 | **Leaderboard** | Leaderboard detail cards: click an entity to see its full dimension profile inline | PLANNED |
-| FB-16 | **Comparisons** | Intra-firm team comparison: side-by-side radar/bar of advisors within a firm | PLANNED |
-| FB-17 | **Comparisons** | Entity-to-entity comparison: overlay two entities for head-to-head dimension comparison | PLANNED |
-| FB-18 | **Comparisons** | Mock partner group data: generate synthetic `partner_group` field for dev/demo | PLANNED |
+| FB-11 | **Benchmarks** | Premier pool deep-dive: composition stats, dimension distributions, P25/P50/P75 breakpoints, advisor vs firm profiles | DONE |
+| FB-12 | **Benchmarks** | Population distribution charts: where entities fall on each dimension, "you are here" marker | DONE |
+| FB-13 | **Benchmarks** | Peer percentile summary card: selected entity's scores vs benchmark breakpoints | DONE |
+| FB-14 | **Leaderboard** | Dimension leaderboard: top-N entities per dimension, filterable by type and pool | DONE |
+| FB-15 | **Leaderboard** | Leaderboard detail cards: click an entity to see its full dimension profile inline | DONE |
+| FB-16 | **Comparisons** | Intra-firm team comparison: side-by-side radar/bar of advisors within a firm | DONE |
+| FB-17 | **Comparisons** | Entity-to-entity comparison: overlay two entities for head-to-head dimension comparison | DONE |
+| FB-18 | **Comparisons** | Mock partner group data: generate synthetic `partner_group` field for dev/demo | DONE |
 
 ### Backlog
 | Item | Description | Status |
@@ -130,42 +130,42 @@
 ### Sprint 3
 
 #### FB-11 · Benchmarks Tab: Premier Pool Deep-Dive
-- **Source:** ZM / BT · **Status:** PLANNED
+- **Source:** ZM / BT · **Status:** DONE
 - **Rationale:** There's a lot more to say about the premier benchmark group. What's the composition? How many firms vs advisors? What does the review count distribution look like? What are the dimension averages and spreads?
 - **Scope:** New page content for `/benchmarks`. Stats cards, composition breakdowns, dimension distribution visuals at both advisor and firm level.
 
 #### FB-12 · Benchmarks Tab: Population Distribution Charts
-- **Source:** ZM · **Status:** PLANNED
+- **Source:** ZM · **Status:** DONE
 - **Rationale:** Show where all entities fall on each dimension — histograms or violin plots with a "you are here" marker for a selected entity.
 - **Scope:** New chart builders, entity selector integration on benchmarks page.
 
 #### FB-13 · Benchmarks Tab: Peer Percentile Summary Card
-- **Source:** ZM · **Status:** PLANNED
+- **Source:** ZM · **Status:** DONE
 - **Rationale:** At-a-glance card: selected entity's scores vs P25/P50/P75 benchmarks across all 6 dimensions. Quick "strengths & gaps" view.
 - **Scope:** New summary component, API integration for breakpoints.
 
 #### FB-14 · Leaderboard Tab: Dimension Leaderboard
-- **Source:** COLLAB · **Status:** PLANNED
+- **Source:** COLLAB · **Status:** DONE
 - **Rationale:** Advisors and firms want to know who's at the top per dimension. Filterable by entity type and pool.
 - **Scope:** New `/leaderboard` page. Top-N entities per dimension with score bars.
 
 #### FB-15 · Leaderboard Tab: Detail Cards
-- **Source:** ZM · **Status:** PLANNED
+- **Source:** ZM · **Status:** DONE
 - **Rationale:** Click a leaderboard entity to see its full dimension profile inline — avoids navigating away.
 - **Scope:** Expandable detail panel within the leaderboard page.
 
 #### FB-16 · Comparisons Tab: Intra-Firm Team Comparison
-- **Source:** BT · **Status:** PLANNED
+- **Source:** BT · **Status:** DONE
 - **Rationale:** Multi-advisor firms want to see advisors side-by-side. Brian confirmed `partner_group` field will be available; mock data for now.
 - **Scope:** New `/comparisons` page. Side-by-side radar/bar chart, firm selector, advisor checklist. Disclaimer banner for synthetic data.
 
 #### FB-17 · Comparisons Tab: Entity-to-Entity Comparison
-- **Source:** BT · **Status:** PLANNED
+- **Source:** BT · **Status:** DONE
 - **Rationale:** "Compare to another advisor" — select any two entities for head-to-head dimension overlay.
 - **Scope:** Dual-entity selector, overlay chart on comparisons page.
 
 #### FB-18 · Mock Partner Group Data
-- **Source:** BT · **Status:** PLANNED
+- **Source:** BT · **Status:** DONE
 - **Rationale:** Brian suggested adding a dummy `partner_group` field to mock intra-firm associations until the real export is available.
 - **Decision:** Generate synthetic partner groups for ~10 fake firm clusters using existing advisor data. Include a prominent "Synthetic Data" disclaimer.
 - **Scope:** Script to generate mock data, updated `advisor_dimension_scores.csv` or supplemental CSV.
@@ -200,3 +200,4 @@
 | 2026-03-09 | FB-11–FB-18 | Sprint 3 planned: Benchmarks tab (FB-11/12/13), Leaderboard tab (FB-14/15), Comparisons tab (FB-16/17/18). |
 | 2026-03-09 | FB-19–FB-22 | Backlog renumbered: keyword highlighting, dimension trends, external ingestion, national network. |
 | 2026-03-09 | README | Updated to reflect Sprints 1-2 features and Sprint 3 plan. |
+| 2026-03-09 | FB-11–FB-18 | Sprint 3 completed: Benchmarks page (pool stats, histograms, percentile table), Leaderboard page (top-N bars, detail cards), Comparisons page (team spider/bar, head-to-head overlay). New API endpoints, mock partner groups, roles/nav updated. |

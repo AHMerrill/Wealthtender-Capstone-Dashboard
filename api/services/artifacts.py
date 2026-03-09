@@ -110,6 +110,13 @@ class ArtifactStore:
         self._enrich_review_dim_scores()
         self._enrich_advisor_review_counts()
 
+        # Partner groups (mock data for intra-firm comparison)
+        pg_path = ROOT / "artifacts" / "scoring" / "partner_groups_mock.csv"
+        if pg_path.is_file():
+            self.partner_groups = pd.read_csv(pg_path, encoding="utf-8")
+        else:
+            self.partner_groups = pd.DataFrame()
+
         # Capabilities
         self.has_firms = (
             not self.scores.empty
@@ -564,6 +571,154 @@ class ArtifactStore:
             "review_date": str(row.get("review_date", "")) if pd.notna(row.get("review_date")) else "",
             "scores": scores,
         }
+
+    # ----------------------------------------------------------------------------------
+    # Benchmarks / Leaderboard / Comparisons
+    # ----------------------------------------------------------------------------------
+
+    def benchmark_pool_stats(self, min_peer_reviews: int = 20) -> Dict:
+        """Premier pool composition: counts, review distributions, dimension stats."""
+        if self.advisor_dim_scores.empty:
+            return {}
+        df = self.advisor_dim_scores.copy()
+        if "review_count" not in df.columns:
+            return {}
+        premier = df[df["review_count"] >= min_peer_reviews]
+        all_ent = df
+
+        def _dim_stats(sub, method="mean"):
+            stats = {}
+            for d in self._SIM_DIMS:
+                col = f"sim_{method}_{d}"
+                if col in sub.columns:
+                    vals = sub[col].dropna()
+                    stats[d] = {
+                        "mean": float(vals.mean()),
+                        "median": float(vals.median()),
+                        "std": float(vals.std()),
+                        "p25": float(vals.quantile(0.25)),
+                        "p75": float(vals.quantile(0.75)),
+                        "min": float(vals.min()),
+                        "max": float(vals.max()),
+                    }
+            return stats
+
+        return {
+            "all": {
+                "total": int(len(all_ent)),
+                "firms": int((all_ent["entity_type"] == "firm").sum()),
+                "advisors": int((all_ent["entity_type"] == "advisor").sum()),
+                "review_count_stats": {
+                    "mean": float(all_ent["review_count"].mean()),
+                    "median": float(all_ent["review_count"].median()),
+                    "min": int(all_ent["review_count"].min()),
+                    "max": int(all_ent["review_count"].max()),
+                },
+                "dim_stats": _dim_stats(all_ent),
+            },
+            "premier": {
+                "total": int(len(premier)),
+                "firms": int((premier["entity_type"] == "firm").sum()),
+                "advisors": int((premier["entity_type"] == "advisor").sum()),
+                "review_count_stats": {
+                    "mean": float(premier["review_count"].mean()),
+                    "median": float(premier["review_count"].median()),
+                    "min": int(premier["review_count"].min()) if len(premier) else 0,
+                    "max": int(premier["review_count"].max()) if len(premier) else 0,
+                },
+                "dim_stats": _dim_stats(premier),
+            },
+        }
+
+    def benchmark_distributions(self, method: str = "mean",
+                                 entity_type: str = "all",
+                                 min_peer_reviews: int = 0) -> Dict:
+        """Score distributions per dimension for histogram rendering."""
+        if self.advisor_dim_scores.empty:
+            return {}
+        df = self.advisor_dim_scores.copy()
+        if entity_type != "all":
+            df = df[df["entity_type"] == entity_type]
+        if min_peer_reviews > 0 and "review_count" in df.columns:
+            df = df[df["review_count"] >= min_peer_reviews]
+        result = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            if col in df.columns:
+                result[d] = df[col].dropna().tolist()
+        return result
+
+    def leaderboard(self, method: str = "mean", entity_type: str = "all",
+                    min_peer_reviews: int = 0, top_n: int = 10) -> Dict:
+        """Top-N entities per dimension."""
+        if self.advisor_dim_scores.empty:
+            return {}
+        df = self.advisor_dim_scores.copy()
+        if entity_type != "all":
+            df = df[df["entity_type"] == entity_type]
+        if min_peer_reviews > 0 and "review_count" in df.columns:
+            df = df[df["review_count"] >= min_peer_reviews]
+        result = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            if col not in df.columns:
+                continue
+            top = df.nlargest(top_n, col)
+            entries = []
+            for _, row in top.iterrows():
+                entries.append({
+                    "advisor_id": row["advisor_id"],
+                    "advisor_name": row["advisor_name"],
+                    "entity_type": row["entity_type"],
+                    "score": float(row[col]),
+                    "review_count": int(row.get("review_count", 0)),
+                })
+            result[d] = entries
+        return result
+
+    def leaderboard_entity_profile(self, entity_id: str,
+                                    method: str = "mean") -> Optional[Dict]:
+        """Full dimension profile for a leaderboard entity."""
+        return self.dna_advisor_scores(entity_id, method)
+
+    def partner_group_list(self) -> List[Dict]:
+        """Return list of partner groups with member counts."""
+        if self.partner_groups.empty:
+            return []
+        groups = self.partner_groups.groupby(
+            ["partner_group_code", "partner_group_name"]
+        ).size().reset_index(name="member_count")
+        return _sanitize_records(groups)
+
+    def partner_group_members(self, group_code: str,
+                               method: str = "mean") -> Optional[Dict]:
+        """Return advisors in a partner group with their dimension scores."""
+        if self.partner_groups.empty:
+            return None
+        members = self.partner_groups[
+            self.partner_groups["partner_group_code"] == group_code
+        ]
+        if members.empty:
+            return None
+        advisor_ids = members["advisor_id"].tolist()
+        group_name = members.iloc[0]["partner_group_name"]
+        profiles = []
+        for aid in advisor_ids:
+            scores = self.dna_advisor_scores(aid, method)
+            if scores:
+                profiles.append(scores)
+        return {"group_code": group_code, "group_name": group_name,
+                "members": profiles}
+
+    def entity_comparison(self, entity_ids: List[str],
+                           method: str = "mean") -> List[Dict]:
+        """Return dimension scores for multiple entities for comparison."""
+        results = []
+        for eid in entity_ids:
+            scores = self.dna_advisor_scores(eid, method)
+            if scores:
+                results.append(scores)
+        return results
 
     # ----------------------------------------------------------------------------------
     # EDA

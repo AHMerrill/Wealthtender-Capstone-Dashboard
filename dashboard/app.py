@@ -687,7 +687,7 @@ def update_sidebar(pathname, user_role_data):
         return hide, "", hide, hide, hide, grid_full
 
     # Pages that manage their own sidebar/layout — hide the app sidebar
-    if pathname in ("/methodology",):
+    if pathname in ("/methodology", "/benchmarks", "/leaderboard", "/comparisons"):
         return hide, "", hide, hide, hide, grid_full
 
     cfg = get_role_config(role)

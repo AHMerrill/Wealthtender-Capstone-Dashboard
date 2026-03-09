@@ -273,3 +273,55 @@ def advisor_dna_review_detail(review_idx: int):
     if detail is None:
         raise HTTPException(status_code=404, detail="review not found")
     return detail
+
+
+# ---------------------------------------------------------------------------
+# Benchmarks / Leaderboard / Comparisons
+# ---------------------------------------------------------------------------
+
+@app.get("/api/benchmarks/pool-stats")
+def benchmarks_pool_stats(min_peer_reviews: int = Query(20, ge=1)):
+    return store.benchmark_pool_stats(min_peer_reviews)
+
+
+@app.get("/api/benchmarks/distributions")
+def benchmarks_distributions(
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+    entity_type: str = "all",
+    min_peer_reviews: int = Query(0, ge=0),
+):
+    return store.benchmark_distributions(method, entity_type, min_peer_reviews)
+
+
+@app.get("/api/leaderboard")
+def leaderboard(
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+    entity_type: str = "all",
+    min_peer_reviews: int = Query(0, ge=0),
+    top_n: int = Query(10, ge=1, le=50),
+):
+    return store.leaderboard(method, entity_type, min_peer_reviews, top_n)
+
+
+@app.get("/api/comparisons/partner-groups")
+def partner_groups():
+    return store.partner_group_list()
+
+
+@app.get("/api/comparisons/partner-group/{group_code}")
+def partner_group_members(
+    group_code: str,
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+):
+    data = store.partner_group_members(group_code, method)
+    if data is None:
+        raise HTTPException(status_code=404, detail="partner group not found")
+    return data
+
+
+@app.get("/api/comparisons/entities")
+def entity_comparison(
+    entity_ids: List[str] = Query(...),
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+):
+    return store.entity_comparison(entity_ids, method)

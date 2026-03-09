@@ -139,6 +139,44 @@ def get_dna_review_detail(review_idx: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Benchmarks / Leaderboard / Comparisons
+# ---------------------------------------------------------------------------
+
+def get_benchmark_pool_stats(min_peer_reviews: int = 20) -> dict:
+    return _get("/api/benchmarks/pool-stats",
+                params={"min_peer_reviews": min_peer_reviews}) or {}
+
+
+def get_benchmark_distributions(method: str = "mean", entity_type: str = "all",
+                                 min_peer_reviews: int = 0) -> dict:
+    params = {"method": method, "entity_type": entity_type}
+    if min_peer_reviews > 0:
+        params["min_peer_reviews"] = min_peer_reviews
+    return _get("/api/benchmarks/distributions", params=params) or {}
+
+
+def get_leaderboard(method: str = "mean", entity_type: str = "all",
+                    min_peer_reviews: int = 0, top_n: int = 10) -> dict:
+    params = {"method": method, "entity_type": entity_type,
+              "min_peer_reviews": min_peer_reviews, "top_n": top_n}
+    return _get("/api/leaderboard", params=params) or {}
+
+
+def get_partner_groups() -> list:
+    return _get("/api/comparisons/partner-groups") or []
+
+
+def get_partner_group_members(group_code: str, method: str = "mean") -> dict:
+    return _get(f"/api/comparisons/partner-group/{group_code}",
+                params={"method": method}) or {}
+
+
+def get_entity_comparison(entity_ids: list, method: str = "mean") -> list:
+    return _get("/api/comparisons/entities",
+                params={"entity_ids": entity_ids, "method": method}) or []
+
+
+# ---------------------------------------------------------------------------
 # API warm-up with retry (critical for Render cold-start)
 # ---------------------------------------------------------------------------
 

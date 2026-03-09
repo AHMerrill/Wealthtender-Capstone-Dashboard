@@ -26,6 +26,8 @@ ROLES = {
             "/eda",
             "/advisor-dna",
             "/benchmarks",
+            "/leaderboard",
+            "/comparisons",
             "/methodology",
         ],
         "show_firm_picker": True,
@@ -37,6 +39,8 @@ ROLES = {
         "pages": [
             "/advisor-dna",
             "/benchmarks",
+            "/leaderboard",
+            "/comparisons",
         ],
         "show_firm_picker": False,   # firm comes from auth context
         "firm_locked": True,
