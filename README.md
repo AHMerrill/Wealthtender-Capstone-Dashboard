@@ -345,9 +345,11 @@ This project is licensed under the **Apache License 2.0** — see [LICENSE](./LI
 - Retain the copyright notice and LICENSE file in all copies
 - Include the [NOTICE](./NOTICE) file in any distribution or derivative work
 - Clearly state any modifications you have made
-- Provide attribution to the original author (Zan Merrill)
+- Provide attribution to the original authors and contributors
 
-The NOTICE file contains the required attribution text. If you deploy a modified version, the NOTICE and LICENSE must travel with it.
+The NOTICE file contains the required attribution text and the full list of contributors. If you deploy a modified version, the NOTICE and LICENSE must travel with it.
+
+**Built by** the UT Austin McCombs School of Business MSBA Capstone Team (2026) in partnership with Wealthtender, with significant development assistance from Claude (Anthropic).
 
 ---
 
