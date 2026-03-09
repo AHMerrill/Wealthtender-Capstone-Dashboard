@@ -687,7 +687,7 @@ def layout():
                         style={"display": "none"},
                     ),
                     _desc_grid("entity"),
-                    # Attribute detail: definition + review list
+                    # Attribute detail: definition + evidence + review list
                     html.Div(
                         id="dna-attr-panel",
                         style=_HIDE,
@@ -701,7 +701,11 @@ def layout():
                                 "color": COLORS["ink"], "fontFamily": FONT_FAMILY,
                                 "marginBottom": "16px", "fontStyle": "italic",
                             }),
-                            html.Div("Select a review to see full details:", style={
+                            # Top evidence cards (FB-10)
+                            html.Div(id="dna-evidence-cards", style={
+                                "marginBottom": "16px",
+                            }),
+                            html.Div("Browse all reviews ranked by association:", style={
                                 "fontSize": "12px", "color": COLORS["gray"],
                                 "marginBottom": "6px",
                             }),
@@ -1096,10 +1100,96 @@ def show_macro_query(bar_click, card_clicks):
 # Entity pie wedge click -> show definition + sorted review list
 # ---------------------------------------------------------------------------
 
+def _build_evidence_cards(sorted_reviews, dim_key, top_n=3):
+    """Build top-N evidence cards showing why this dimension scored the way it did."""
+    sim_col = f"sim_{dim_key}"
+    top_reviews = sorted_reviews[:top_n]
+    if not top_reviews:
+        return ""
+
+    cards = []
+    for i, r in enumerate(top_reviews):
+        score = r.get(sim_col, 0) or 0
+        tier = _score_tier(score)
+        reviewer = r.get("reviewer_name", "") or "Anonymous"
+        review_date = r.get("review_date", "") or ""
+        date_str = str(review_date).split("T")[0].split(" ")[0] if review_date else ""
+        raw_text = r.get("review_text_raw", "") or ""
+        # Truncate to ~200 chars for the snippet
+        snippet = raw_text[:200].strip()
+        if len(raw_text) > 200:
+            snippet += "..."
+
+        rank_badge_color = ["#198754", "#0D6EFD", "#6C757D"][i] if i < 3 else COLORS["gray"]
+
+        cards.append(html.Div(
+            style={
+                "padding": "12px 14px", "borderRadius": "6px",
+                "backgroundColor": "white",
+                "border": f"1px solid {COLORS['border']}",
+                "marginBottom": "8px",
+            },
+            children=[
+                html.Div(
+                    style={"display": "flex", "justifyContent": "space-between",
+                           "alignItems": "center", "marginBottom": "6px"},
+                    children=[
+                        html.Div(
+                            style={"display": "flex", "alignItems": "center", "gap": "8px"},
+                            children=[
+                                html.Span(f"#{i + 1}", style={
+                                    "backgroundColor": rank_badge_color,
+                                    "color": "white", "borderRadius": "50%",
+                                    "width": "22px", "height": "22px",
+                                    "display": "inline-flex", "alignItems": "center",
+                                    "justifyContent": "center", "fontSize": "11px",
+                                    "fontWeight": "700",
+                                }),
+                                html.Span(reviewer, style={
+                                    "fontWeight": "600", "fontSize": "13px",
+                                    "color": COLORS["navy"],
+                                }),
+                                html.Span(date_str, style={
+                                    "fontSize": "11px", "color": COLORS["gray"],
+                                }) if date_str else None,
+                            ],
+                        ),
+                        html.Span(f"{tier} ({score:.3f})", style={
+                            "fontSize": "11px", "fontWeight": "600",
+                            "color": DIM_COLORS[dim_key],
+                            "backgroundColor": f"{DIM_COLORS[dim_key]}15",
+                            "padding": "2px 8px", "borderRadius": "4px",
+                        }),
+                    ],
+                ),
+                html.Div(snippet, style={
+                    "fontSize": "12px", "lineHeight": "1.5",
+                    "color": COLORS["ink"], "fontStyle": "italic",
+                }),
+            ],
+        ))
+
+    return html.Div([
+        html.Div(
+            style={"display": "flex", "alignItems": "center", "gap": "6px",
+                   "marginBottom": "8px"},
+            children=[
+                html.Span("\U0001f50d", style={"fontSize": "14px"}),
+                html.Span("Top Evidence — reviews driving this score:", style={
+                    "fontSize": "12px", "fontWeight": "600",
+                    "color": COLORS["navy"],
+                }),
+            ],
+        ),
+        *cards,
+    ])
+
+
 @callback(
     Output("dna-attr-panel", "style"),
     Output("dna-attr-title", "children"),
     Output("dna-attr-query", "children"),
+    Output("dna-evidence-cards", "children"),
     Output("dna-review-selector", "options"),
     Output("dna-review-selector", "value"),
     Output("dna-selected-dim", "data"),
@@ -1110,7 +1200,7 @@ def show_macro_query(bar_click, card_clicks):
     prevent_initial_call=True,
 )
 def handle_entity_pie_click(pie_click, card_clicks, reviews):
-    _no = (no_update,) * 7
+    _no = (no_update,) * 8
     if not reviews:
         return _no
 
@@ -1143,6 +1233,9 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
     sim_col = f"sim_{dim_key}"
     sorted_reviews = sorted(reviews, key=lambda r: r.get(sim_col, 0) or 0, reverse=True)
 
+    # Build evidence cards for top 3
+    evidence = _build_evidence_cards(sorted_reviews, dim_key, top_n=3)
+
     options = []
     for i, r in enumerate(sorted_reviews):
         score = r.get(sim_col, 0) or 0
@@ -1151,14 +1244,14 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
         review_date = r.get("review_date", "") or ""
         date_str = str(review_date).split("T")[0].split(" ")[0] if review_date else ""
         label_text = (
-            f"{DIM_LABELS[dim_key]} \u2014 {tier} ({score:.2f}) \u2014 "
-            f"{reviewer} \u2014 {date_str}"
+            f"{DIM_LABELS[dim_key]} — {tier} ({score:.2f}) — "
+            f"{reviewer} — {date_str}"
         )
         options.append({"label": label_text, "value": r.get("review_idx", i)})
 
     title = html.Span([
         html.Span(DIM_LABELS[dim_key], style={"color": DIM_COLORS[dim_key]}),
-        html.Span(f" \u2014 {len(reviews)} reviews ranked by association",
+        html.Span(f" — {len(reviews)} reviews ranked by association",
                    style={"color": COLORS["gray"], "fontWeight": "400"}),
     ])
 
@@ -1166,6 +1259,7 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
         {**_PANEL_STYLE, "border": f"2px solid {DIM_COLORS[dim_key]}"},
         title,
         f'"{DIM_QUERY_TEXTS[dim_key]}"',
+        evidence,
         options,
         None,
         dim_key,
