@@ -197,76 +197,82 @@ def _build_entity_bars(dim_scores, review_count, title="Dimension Strength",
     return fig
 
 
-def _build_profile_bars(dim_scores, pctile_scores=None, breakpoints=None):
-    """Dimension Profile — descriptive bar chart of scores with tier labels."""
+def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None):
+    """Radar / spider chart for entity view — works with percentile or raw scores."""
+    short_labels = [_DIM_SHORT_LABELS[d] for d in DIMENSIONS]
+    colors_list = [DIM_COLORS[d] for d in DIMENSIONS]
+
     if pctile_scores:
-        dims_sorted = sorted(DIMENSIONS,
-                             key=lambda d: pctile_scores.get(d, 50), reverse=True)
-        labels = [DIM_LABELS[d] for d in dims_sorted]
-        values = [pctile_scores.get(d, 50) for d in dims_sorted]
-        bar_colors = [DIM_COLORS[d] for d in dims_sorted]
-        tiers = [_pctile_tier(v) for v in values]
-        text_labels = [f"{v:.0f}th — {t}" for v, t in zip(values, tiers)]
-        x_title = "Percentile Rank Among Peers"
-        chart_title = "Dimension Profile — Peer Rank"
-        x_range = [0, 115]
+        values = [pctile_scores.get(d, 50) for d in DIMENSIONS]
+        radial_range = [0, 100]
+        radial_title = "Percentile"
+        chart_title = "Dimension Profile — Spider"
+        tier_fn = _pctile_tier
+        value_fmt = lambda v: f"{v:.0f}th"
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
             f"Percentile: {pctile_scores.get(d, 50):.0f}th<br>"
             f"Tier: {_pctile_tier(pctile_scores.get(d, 50))}"
-            for d in dims_sorted
+            for d in DIMENSIONS
         ]
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=labels, x=values, orientation="h",
-            marker=dict(color=bar_colors),
-            text=text_labels, textposition="outside",
-            textfont=dict(size=11, family=FONT_FAMILY, color=COLORS["ink"]),
-            hovertext=hovers, hoverinfo="text",
-        ))
-        fig.add_vline(x=50, line_width=1, line_dash="dot",
-                      line_color=COLORS["gray"], opacity=0.6,
-                      annotation_text="Peer Median",
-                      annotation_position="top",
-                      annotation_font_size=9,
-                      annotation_font_color=COLORS["gray"])
     else:
         bp = breakpoints or {}
-        dims_sorted = sorted(DIMENSIONS,
-                             key=lambda d: dim_scores.get(d, 0), reverse=True)
-        labels = [DIM_LABELS[d] for d in dims_sorted]
-        values = [dim_scores.get(d, 0) for d in dims_sorted]
-        bar_colors = [DIM_COLORS[d] for d in dims_sorted]
-        tiers = [_score_tier(v, bp.get(d)) for v, d in zip(values, dims_sorted)]
-        text_labels = [f"{v:.3f} — {t}" for v, t in zip(values, tiers)]
-        x_title = "Cosine Similarity"
-        chart_title = "Dimension Profile — Review Signal Strength"
-        max_val = max(values) if values else 0.8
-        x_range = [0, max_val * 1.4]
+        values = [dim_scores.get(d, 0) for d in DIMENSIONS]
+        max_val = max(values) if values else 0.6
+        radial_range = [0, max(0.8, max_val * 1.2)]
+        radial_title = "Similarity"
+        chart_title = "Dimension Profile — Spider"
+        tier_fn = lambda v, d=None: _score_tier(v, bp.get(d) if d else None)
+        value_fmt = lambda v: f"{v:.3f}"
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
             f"Similarity: {dim_scores.get(d, 0):.3f}<br>"
             f"Tier: {_score_tier(dim_scores.get(d, 0), bp.get(d))}"
-            for d in dims_sorted
+            for d in DIMENSIONS
         ]
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=labels, x=values, orientation="h",
-            marker=dict(color=bar_colors),
-            text=text_labels, textposition="outside",
-            textfont=dict(size=11, family=FONT_FAMILY, color=COLORS["ink"]),
-            hovertext=hovers, hoverinfo="text",
+
+    values_closed = values + [values[0]]
+    short_labels_closed = short_labels + [short_labels[0]]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=values_closed, theta=short_labels_closed,
+        fill="toself",
+        line=dict(color=COLORS["blue"], width=2),
+        fillcolor="rgba(0, 76, 140, 0.08)",
+        hoverinfo="skip", showlegend=False, name="",
+    ))
+    for i, d in enumerate(DIMENSIONS):
+        fig.add_trace(go.Scatterpolar(
+            r=[values[i]], theta=[short_labels[i]],
+            mode="markers",
+            marker=dict(color=colors_list[i], size=10, symbol="circle"),
+            hovertext=hovers[i], hoverinfo="text",
+            showlegend=True,
+            name=f"{DIM_LABELS[d]}: {value_fmt(values[i])}",
         ))
 
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
-        xaxis=dict(title=dict(text=x_title, font=dict(size=11)),
-                   range=x_range, gridcolor=COLORS["border"]),
-        yaxis=dict(autorange="reversed"),
-        margin=dict(l=10, r=40, t=30, b=40), height=240,
-        paper_bgcolor="white", plot_bgcolor="white",
+        polar=dict(
+            radialaxis=dict(visible=True, range=radial_range,
+                            title=dict(text=radial_title, font=dict(size=10)),
+                            gridcolor=COLORS["border"],
+                            linecolor=COLORS["border"]),
+            angularaxis=dict(gridcolor=COLORS["border"],
+                             linecolor=COLORS["border"],
+                             tickfont=dict(size=12, family=FONT_FAMILY)),
+            bgcolor="white",
+        ),
+        showlegend=True,
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5,
+            font=dict(size=10, family=FONT_FAMILY), itemwidth=30,
+        ),
         title=dict(text=chart_title,
-                   font=dict(size=13, color=COLORS["navy"]), x=0.5),
+                   font=dict(size=14, color=COLORS["navy"]), x=0.5),
+        margin=dict(l=60, r=60, t=50, b=100), height=460,
+        paper_bgcolor="white", plot_bgcolor="white",
     )
     return fig
 
@@ -525,16 +531,35 @@ def layout():
                             html.Div(id="dna-ref-card-content"),
                         ],
                     ),
-                    dcc.Graph(
-                        id="dna-entity-chart",
-                        figure=go.Figure(),
-                        config={"displayModeBar": False},
-                    ),
-                    dcc.Graph(
-                        id="dna-deviation-bars",
-                        figure=go.Figure(),
-                        config={"displayModeBar": False},
-                        style={"marginTop": "8px"},
+                    html.Div(
+                        style={"display": "flex", "gap": "16px",
+                               "flexWrap": "wrap", "alignItems": "stretch"},
+                        children=[
+                            html.Div(
+                                style={"flex": "1", "minWidth": "420px"},
+                                children=[
+                                    dcc.Graph(
+                                        id="dna-entity-chart",
+                                        figure=go.Figure(),
+                                        config={"displayModeBar": False},
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                style={"flex": "1", "minWidth": "380px"},
+                                children=[
+                                    dcc.Graph(
+                                        id="dna-entity-spider",
+                                        figure=go.Figure(),
+                                        config={
+                                            "displayModeBar": False,
+                                            "scrollZoom": False,
+                                            "doubleClick": False,
+                                        },
+                                    ),
+                                ],
+                            ),
+                        ],
                     ),
                     _desc_grid("entity"),
                     # Attribute detail: definition + review list
@@ -708,7 +733,7 @@ def update_ref_card_and_mode(display_mode):
     Output("dna-macro-chart", "figure"),
     Output("dna-entity-section", "style"),
     Output("dna-entity-chart", "figure"),
-    Output("dna-deviation-bars", "figure"),
+    Output("dna-entity-spider", "figure"),
     Output("dna-view-label", "children"),
     Output("dna-entity-reviews-store", "data"),
     Output("dna-attr-panel", "style", allow_duplicate=True),
@@ -817,14 +842,14 @@ def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_t
                 "color": "#0F5132",
             }
 
-        pie = _build_entity_bars(dim_scores, len(reviews), title=title,
-                                 pctile_scores=pctile_data, breakpoints=bp_data)
-        profile_bars = _build_profile_bars(dim_scores, pctile_scores=pctile_data,
-                                           breakpoints=bp_data)
+        bars = _build_entity_bars(dim_scores, len(reviews), title=title,
+                                  pctile_scores=pctile_data, breakpoints=bp_data)
+        spider = _build_entity_spider(dim_scores, pctile_scores=pctile_data,
+                                      breakpoints=bp_data)
 
         return (
             _HIDE, empty_fig,
-            _SHOW, pie, profile_bars,
+            _SHOW, bars, spider,
             f"{kind} View \u2014 {name} ({len(reviews)} reviews, {method_label})",
             reviews,
             _HIDE, _HIDE, [], None, _HIDE,
@@ -942,7 +967,7 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
         points = pie_click.get("points", [])
         if not points:
             return _no
-        label = points[0].get("label", "")
+        label = points[0].get("y", "") or points[0].get("label", "")
         dim_key = _DIM_LABEL_TO_KEY.get(label)
     else:
         import json as _json
