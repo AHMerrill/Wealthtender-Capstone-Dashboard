@@ -670,6 +670,7 @@ def check_api_status(_n):
     Output("eda-filters-section", "style"),
     Output("dna-filters-section", "style"),
     Output("sidebar-page-note", "style"),
+    Output("content-shell", "style"),
     Input("url", "pathname"),
     Input("user-role", "data"),
 )
@@ -677,9 +678,17 @@ def update_sidebar(pathname, user_role_data):
     pathname = _norm(pathname)
     role, firm_id = _get_role_and_firm(user_role_data)
     hide = {"display": "none"}
+    grid_default = {"display": "grid", "gridTemplateColumns": "240px 1fr",
+                    "gap": "16px", "padding": "16px 24px 32px 24px"}
+    grid_full = {"display": "grid", "gridTemplateColumns": "1fr",
+                 "gap": "16px", "padding": "16px 24px 32px 24px"}
 
     if not role or pathname == "/":
-        return hide, "", hide, hide, hide
+        return hide, "", hide, hide, hide, grid_full
+
+    # Pages that manage their own sidebar/layout — hide the app sidebar
+    if pathname in ("/methodology",):
+        return hide, "", hide, hide, hide, grid_full
 
     cfg = get_role_config(role)
     badge = html.Span(
@@ -691,7 +700,7 @@ def update_sidebar(pathname, user_role_data):
     dna = {"display": "block"} if pathname == "/advisor-dna" and "/advisor-dna" in allowed else hide
     note = {"display": "block"} if pathname not in ("/eda", "/advisor-dna") else hide
 
-    return {"display": "block"}, badge, eda, dna, note
+    return {"display": "block"}, badge, eda, dna, note, grid_default
 
 
 # ---------- Stopword panel: show/hide + load defaults ----------
