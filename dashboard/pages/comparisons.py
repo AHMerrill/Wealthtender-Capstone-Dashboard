@@ -114,99 +114,11 @@ def layout():
         style={"padding": "20px", "fontFamily": FONT_FAMILY,
                "maxWidth": "1200px", "margin": "0 auto"},
         children=[
-            # Synthetic Data Disclaimer Banner
-            html.Div(
-                style={
-                    "display": "flex", "alignItems": "flex-start",
-                    "lineHeight": "1.5",
-                    "padding": "14px 16px", "backgroundColor": "#fef3c7",
-                    "borderLeft": "4px solid #f59e0b", "borderRadius": "4px",
-                    "color": "#78350f", "fontSize": "13px",
-                    "fontFamily": FONT_FAMILY, "marginBottom": "28px",
-                },
-                children=[
-                    html.Span("⚠️ ", style={"fontSize": "18px", "marginRight": "8px"}),
-                    html.Span("Development Mode: ",
-                              style={"fontWeight": "600", "marginRight": "4px"}),
-                    html.Span(
-                        "Partner group associations and all comparison data are "
-                        "mocked for development purposes."),
-                ],
-            ),
-
-            # ===== Section 1: Intra-Firm Team Comparison =====
-            _section_card(
-                "Team Comparison",
-                "Select a partner group to view side-by-side performance "
-                "profiles of all advisors within a firm.",
-                COLORS["soft_blue"],
-                [
-                    # Controls Row
-                    html.Div(
-                        style={"display": "flex", "gap": "16px",
-                               "marginBottom": "20px", "flexWrap": "wrap"},
-                        children=[
-                            html.Div(
-                                style={"flex": "2", "minWidth": "250px"},
-                                children=[
-                                    html.Label("Firm / Partner Group:", style={
-                                        "fontWeight": "600", "marginBottom": "6px",
-                                        "display": "block",
-                                        "color": COLORS["ink"], "fontSize": "12px"}),
-                                    dcc.Dropdown(
-                                        id="team-partner-group-dropdown",
-                                        placeholder="Choose a firm...",
-                                        style={"fontSize": "13px"}),
-                                ],
-                            ),
-                            html.Div(
-                                style={"flex": "1", "minWidth": "180px"},
-                                children=[
-                                    html.Label("Calculation Method:", style={
-                                        "fontWeight": "600", "marginBottom": "6px",
-                                        "display": "block",
-                                        "color": COLORS["ink"], "fontSize": "12px"}),
-                                    dcc.Dropdown(
-                                        id="team-method-dropdown",
-                                        options=[
-                                            {"label": "Mean", "value": "mean"},
-                                            {"label": "Penalized", "value": "penalized"},
-                                            {"label": "Weighted", "value": "weighted"},
-                                        ],
-                                        value="mean",
-                                        style={"fontSize": "13px"}),
-                                ],
-                            ),
-                        ],
-                    ),
-
-                    # Team Spider Chart
-                    _chart_card([
-                        dcc.Graph(
-                            id="team-spider-chart",
-                            figure=_empty_fig("Select a partner group above", 400),
-                            config={"responsive": True, "displayModeBar": False},
-                            style={"height": "400px"},
-                        ),
-                    ]),
-
-                    # Team Bar Chart
-                    _chart_card([
-                        dcc.Graph(
-                            id="team-bar-chart",
-                            figure=_empty_fig("Select a partner group above", 350),
-                            config={"responsive": True, "displayModeBar": False},
-                            style={"height": "350px"},
-                        ),
-                    ], margin_bottom="0"),
-                ],
-            ),
-
-            # ===== Section 2: Entity-to-Entity Comparison =====
+            # ===== Section 1: Head-to-Head (real data) =====
             _section_card(
                 "Head-to-Head Comparison",
-                "Select two entities to compare their performance profiles "
-                "across all six Advisor DNA dimensions.",
+                "Select two entities to compare their Advisor DNA performance "
+                "profiles across all six dimensions.",
                 COLORS.get("soft_lavender", "#f3f0ff"),
                 [
                     # Controls Row
@@ -301,6 +213,95 @@ def layout():
                     # Comparison Table
                     _chart_card([
                         html.Div(id="entity-comparison-table"),
+                    ], margin_bottom="0"),
+                ],
+            ),
+
+            # ===== Section 2: Team Comparison (mocked data) =====
+            _section_card(
+                "Team Comparison",
+                "Select a partner group to view side-by-side performance "
+                "profiles of all advisors within a firm.",
+                COLORS["soft_blue"],
+                [
+                    # Dev mode banner — scoped to this section only
+                    html.Div(
+                        style={
+                            "display": "flex", "alignItems": "flex-start",
+                            "lineHeight": "1.5",
+                            "padding": "12px 14px", "backgroundColor": "#fef3c7",
+                            "borderLeft": "4px solid #f59e0b", "borderRadius": "4px",
+                            "color": "#78350f", "fontSize": "12px",
+                            "fontFamily": FONT_FAMILY, "marginBottom": "20px",
+                        },
+                        children=[
+                            html.Span("Dev Mode: ",
+                                      style={"fontWeight": "600",
+                                             "marginRight": "4px"}),
+                            html.Span(
+                                "Partner group associations are mocked for "
+                                "development. Will be replaced with real data "
+                                "in production."),
+                        ],
+                    ),
+
+                    # Controls Row
+                    html.Div(
+                        style={"display": "flex", "gap": "16px",
+                               "marginBottom": "20px", "flexWrap": "wrap"},
+                        children=[
+                            html.Div(
+                                style={"flex": "2", "minWidth": "250px"},
+                                children=[
+                                    html.Label("Firm / Partner Group:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.Dropdown(
+                                        id="team-partner-group-dropdown",
+                                        placeholder="Choose a firm...",
+                                        style={"fontSize": "13px"}),
+                                ],
+                            ),
+                            html.Div(
+                                style={"flex": "1", "minWidth": "180px"},
+                                children=[
+                                    html.Label("Calculation Method:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.Dropdown(
+                                        id="team-method-dropdown",
+                                        options=[
+                                            {"label": "Mean", "value": "mean"},
+                                            {"label": "Penalized", "value": "penalized"},
+                                            {"label": "Weighted", "value": "weighted"},
+                                        ],
+                                        value="mean",
+                                        style={"fontSize": "13px"}),
+                                ],
+                            ),
+                        ],
+                    ),
+
+                    # Team Spider Chart
+                    _chart_card([
+                        dcc.Graph(
+                            id="team-spider-chart",
+                            figure=_empty_fig("Select a partner group above", 400),
+                            config={"responsive": True, "displayModeBar": False},
+                            style={"height": "400px"},
+                        ),
+                    ]),
+
+                    # Team Bar Chart
+                    _chart_card([
+                        dcc.Graph(
+                            id="team-bar-chart",
+                            figure=_empty_fig("Select a partner group above", 350),
+                            config={"responsive": True, "displayModeBar": False},
+                            style={"height": "350px"},
+                        ),
                     ], margin_bottom="0"),
                 ],
             ),
