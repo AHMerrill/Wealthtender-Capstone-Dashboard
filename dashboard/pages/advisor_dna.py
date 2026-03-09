@@ -383,7 +383,7 @@ def layout():
             dcc.Store(id="dna-graph-data", data=[]),
             dcc.Store(id="dna-entity-reviews-store", data=[]),
             dcc.Store(id="dna-selected-dim", data=None),
-            dcc.Store(id="dna-display-mode", data="raw"),
+            dcc.Store(id="dna-display-mode", data="percentile"),
 
             html.H2("Advisor DNA", style={
                 "marginBottom": "4px", "color": COLORS["navy"],
@@ -460,7 +460,7 @@ def layout():
                                             {"label": "Raw Similarity", "value": "raw"},
                                             {"label": "Percentile Rank", "value": "percentile"},
                                         ],
-                                        value="raw", inline=True,
+                                        value="percentile", inline=True,
                                         labelStyle={"fontSize": "12px",
                                                     "marginRight": "12px"},
                                     ),
@@ -643,7 +643,7 @@ _PCTILE_REF_CONTENT = html.Div([
     Input("dna-display-toggle", "value"),
 )
 def update_ref_card_and_mode(display_mode):
-    display_mode = display_mode or "raw"
+    display_mode = display_mode or "percentile"
     content = _PCTILE_REF_CONTENT if display_mode == "percentile" else _RAW_REF_CONTENT
     return content, display_mode
 
@@ -673,7 +673,7 @@ def update_main_view(current_view, entity_id, method, display_mode, entity_type)
     log = logging.getLogger(__name__)
     empty_fig = go.Figure()
     method = method or "mean"
-    display_mode = display_mode or "raw"
+    display_mode = display_mode or "percentile"
 
     try:
         return _update_main_view_inner(entity_id, method, display_mode, entity_type)
