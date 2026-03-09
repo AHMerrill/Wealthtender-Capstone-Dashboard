@@ -206,8 +206,10 @@ def advisor_dna_macro():
 
 
 @app.get("/api/advisor-dna/macro-totals")
-def advisor_dna_macro_totals():
-    data = store.dna_macro_totals()
+def advisor_dna_macro_totals(
+    min_peer_reviews: int = Query(0, ge=0),
+):
+    data = store.dna_macro_totals(min_peer_reviews=min_peer_reviews)
     if not data:
         raise HTTPException(status_code=404, detail="Advisor DNA data not available")
     return data

@@ -96,8 +96,11 @@ def get_dna_macro() -> list:
     return _get("/api/advisor-dna/macro") or []
 
 
-def get_dna_macro_totals() -> dict:
-    return _get("/api/advisor-dna/macro-totals") or {}
+def get_dna_macro_totals(min_peer_reviews: int = 0) -> dict:
+    params = {}
+    if min_peer_reviews > 0:
+        params["min_peer_reviews"] = min_peer_reviews
+    return _get("/api/advisor-dna/macro-totals", params=params or None) or {}
 
 
 def get_dna_entities() -> dict:

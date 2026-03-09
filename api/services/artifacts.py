@@ -389,15 +389,31 @@ class ArtifactStore:
         self._dna_macro_cache = _sanitize_records(sample[[c for c in cols if c in sample.columns]])
         return self._dna_macro_cache
 
-    def dna_macro_totals(self) -> dict:
-        """Return aggregate dimension totals across ALL reviews."""
+    def dna_macro_totals(self, min_peer_reviews: int = 0) -> dict:
+        """Return aggregate dimension totals across reviews.
+
+        min_peer_reviews: if > 0, only include reviews belonging to entities
+        with at least this many reviews (premier filtering).
+        """
         if self.review_dim_scores.empty:
+            return {}
+        df = self.review_dim_scores
+        if min_peer_reviews > 0 and not self.advisor_dim_scores.empty:
+            # Get entities that meet the threshold
+            if "review_count" in self.advisor_dim_scores.columns:
+                premier_ids = set(
+                    self.advisor_dim_scores[
+                        self.advisor_dim_scores["review_count"] >= min_peer_reviews
+                    ]["advisor_id"]
+                )
+                df = df[df["advisor_id"].isin(premier_ids)]
+        if df.empty:
             return {}
         totals = {}
         for col in self._REVIEW_SIM_COLS:
-            if col in self.review_dim_scores.columns:
-                totals[col] = float(self.review_dim_scores[col].sum())
-        return {"totals": totals, "review_count": len(self.review_dim_scores)}
+            if col in df.columns:
+                totals[col] = float(df[col].sum())
+        return {"totals": totals, "review_count": len(df)}
 
     def dna_entity_list(self) -> Dict[str, list]:
         if self.advisor_dim_scores.empty:

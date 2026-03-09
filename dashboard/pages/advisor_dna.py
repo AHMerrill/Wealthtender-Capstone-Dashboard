@@ -92,6 +92,69 @@ def _pctile_tier(pctile: float) -> str:
     return _TIER_LABELS[3]
 
 
+def _build_macro_spider(dim_totals, review_count, title="Dimension Strength"):
+    """Macro spider/radar chart — uses aggregate totals, same visual as entity spider."""
+    short_labels = [_DIM_SHORT_LABELS[d] for d in DIMENSIONS]
+    colors_list = [DIM_COLORS[d] for d in DIMENSIONS]
+    values = [dim_totals.get(d, 0) for d in DIMENSIONS]
+    max_val = max(values) if values else 1
+    radial_range = [0, max_val * 1.15]
+
+    hovers = [
+        f"<b>{DIM_LABELS[d]}</b><br>"
+        f"Aggregate Score: {dim_totals.get(d, 0):,.1f}<br><br>"
+        f"<i>{DIM_DESCRIPTIONS[d]}</i>"
+        for d in DIMENSIONS
+    ]
+
+    values_closed = values + [values[0]]
+    short_labels_closed = short_labels + [short_labels[0]]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=values_closed, theta=short_labels_closed,
+        fill="toself",
+        line=dict(color=COLORS["blue"], width=2),
+        fillcolor="rgba(0, 76, 140, 0.08)",
+        hoverinfo="skip", showlegend=False, name="",
+    ))
+    for i, d in enumerate(DIMENSIONS):
+        ranked = sorted(DIMENSIONS, key=lambda x: dim_totals.get(x, 0), reverse=True)
+        rank = ranked.index(d) + 1
+        fig.add_trace(go.Scatterpolar(
+            r=[values[i]], theta=[short_labels[i]],
+            mode="markers",
+            marker=dict(color=colors_list[i], size=10, symbol="circle"),
+            hovertext=hovers[i], hoverinfo="text",
+            showlegend=True,
+            name=f"{DIM_LABELS[d]}: #{rank} ({values[i]:,.1f})",
+        ))
+
+    fig.update_layout(
+        font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
+        polar=dict(
+            radialaxis=dict(visible=True, range=radial_range,
+                            title=dict(text="Aggregate Score", font=dict(size=10)),
+                            gridcolor=COLORS["border"],
+                            linecolor=COLORS["border"]),
+            angularaxis=dict(gridcolor=COLORS["border"],
+                             linecolor=COLORS["border"],
+                             tickfont=dict(size=12, family=FONT_FAMILY)),
+            bgcolor="white",
+        ),
+        showlegend=True,
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5,
+            font=dict(size=10, family=FONT_FAMILY), itemwidth=30,
+        ),
+        title=dict(text=f"{title}  ({review_count:,} reviews)",
+                   font=dict(size=14, color=COLORS["navy"]), x=0.5),
+        margin=dict(l=60, r=60, t=50, b=100), height=460,
+        paper_bgcolor="white", plot_bgcolor="white",
+    )
+    return fig
+
+
 def _build_macro_bars(dim_totals, review_count, title="Dimension Strength"):
     """Macro horizontal bar chart — sorted by total score, rank labels."""
     ranked = sorted(DIMENSIONS, key=lambda d: dim_totals.get(d, 0), reverse=True)
@@ -441,10 +504,67 @@ def layout():
             html.Div(
                 id="dna-macro-section",
                 children=[
+                    # Macro controls row: comparison pool, chart type
+                    html.Div(
+                        style={"display": "flex", "justifyContent": "flex-start",
+                               "alignItems": "center", "marginBottom": "12px",
+                               "flexWrap": "wrap", "gap": "24px"},
+                        children=[
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "8px"},
+                                children=[
+                                    html.Span("Comparison Pool:", style={
+                                        "fontSize": "12px", "color": COLORS["gray"],
+                                        "fontWeight": "600"}),
+                                    dcc.RadioItems(
+                                        id="dna-macro-pool-toggle",
+                                        options=[
+                                            {"label": "All Reviews", "value": "all"},
+                                            {"label": "Premier (20+ reviews)",
+                                             "value": "premier"},
+                                        ],
+                                        value="all", inline=True,
+                                        labelStyle={"fontSize": "12px",
+                                                    "marginRight": "12px"},
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "8px"},
+                                children=[
+                                    html.Span("Chart:", style={
+                                        "fontSize": "12px", "color": COLORS["gray"],
+                                        "fontWeight": "600"}),
+                                    dcc.RadioItems(
+                                        id="dna-macro-chart-type-toggle",
+                                        options=[
+                                            {"label": "Bar", "value": "bar"},
+                                            {"label": "Spider", "value": "spider"},
+                                        ],
+                                        value="bar", inline=True,
+                                        labelStyle={"fontSize": "12px",
+                                                    "marginRight": "12px"},
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                     dcc.Graph(
                         id="dna-macro-chart",
                         figure=go.Figure(),
                         config={"displayModeBar": False},
+                    ),
+                    dcc.Graph(
+                        id="dna-macro-spider",
+                        figure=go.Figure(),
+                        config={
+                            "displayModeBar": False,
+                            "scrollZoom": False,
+                            "doubleClick": False,
+                        },
+                        style={"display": "none"},
                     ),
                     _desc_grid("macro"),
                     html.Div(
@@ -747,8 +867,22 @@ def toggle_chart_type(chart_type):
 
 
 @callback(
+    Output("dna-macro-chart", "style"),
+    Output("dna-macro-spider", "style"),
+    Input("dna-macro-chart-type-toggle", "value"),
+    prevent_initial_call=True,
+)
+def toggle_macro_chart_type(chart_type):
+    chart_type = chart_type or "bar"
+    if chart_type == "spider":
+        return {"display": "none"}, {"display": "block"}
+    return {"display": "block"}, {"display": "none"}
+
+
+@callback(
     Output("dna-macro-section", "style"),
     Output("dna-macro-chart", "figure"),
+    Output("dna-macro-spider", "figure"),
     Output("dna-entity-section", "style"),
     Output("dna-entity-chart", "figure"),
     Output("dna-entity-spider", "figure"),
@@ -766,34 +900,39 @@ def toggle_chart_type(chart_type):
     Input("dna-method-selector", "value"),
     Input("dna-display-toggle", "value"),
     Input("dna-pool-toggle", "value"),
+    Input("dna-macro-pool-toggle", "value"),
     State("dna-entity-type", "value"),
     prevent_initial_call=True,
 )
-def update_main_view(current_view, entity_id, method, display_mode, pool_mode, entity_type):
+def update_main_view(current_view, entity_id, method, display_mode, pool_mode,
+                     macro_pool_mode, entity_type):
     import logging
     log = logging.getLogger(__name__)
     empty_fig = go.Figure()
     method = method or "mean"
     display_mode = display_mode or "percentile"
     pool_mode = pool_mode or "premier"
+    macro_pool_mode = macro_pool_mode or "all"
 
     try:
-        return _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_type)
+        return _update_main_view_inner(entity_id, method, display_mode, pool_mode,
+                                       macro_pool_mode, entity_type)
     except Exception:
         log.exception("update_main_view failed")
-        return (_SHOW, empty_fig, _HIDE, empty_fig, empty_fig,
+        return (_SHOW, empty_fig, empty_fig, _HIDE, empty_fig, empty_fig,
                 "Error loading view.", [], _HIDE, _HIDE, [], None, _HIDE,
                 "", {"display": "none"})
 
 
-def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_type):
+def _update_main_view_inner(entity_id, method, display_mode, pool_mode,
+                            macro_pool_mode, entity_type):
     empty_fig = go.Figure()
 
     if entity_id:
         reviews = get_dna_entity_reviews(entity_id)
         if not reviews:
             label = "No reviews found for this entity."
-            return (_HIDE, empty_fig, _SHOW, empty_fig, empty_fig,
+            return (_HIDE, empty_fig, empty_fig, _SHOW, empty_fig, empty_fig,
                     label, [], _HIDE, _HIDE, [], None, _HIDE,
                     "", {"display": "none"})
 
@@ -866,7 +1005,7 @@ def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_t
                                       breakpoints=bp_data, title=title)
 
         return (
-            _HIDE, empty_fig,
+            _HIDE, empty_fig, empty_fig,
             _SHOW, bars, spider,
             f"{kind} View \u2014 {name} ({len(reviews)} reviews, {method_label})",
             reviews,
@@ -874,22 +1013,25 @@ def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_t
             banner_children, banner_style,
         )
 
-    macro_data = get_dna_macro_totals()
+    min_peer = 20 if macro_pool_mode == "premier" else 0
+    macro_data = get_dna_macro_totals(min_peer_reviews=min_peer)
     if not macro_data or "totals" not in macro_data:
-        return (_SHOW, empty_fig, _HIDE, empty_fig, empty_fig,
+        return (_SHOW, empty_fig, empty_fig, _HIDE, empty_fig, empty_fig,
                 "Loading data...", [], _HIDE, _HIDE, [], None, _HIDE,
                 "", {"display": "none"})
 
     raw_totals = macro_data["totals"]
     review_count = macro_data.get("review_count", 0)
     dim_totals = {d: raw_totals.get(f"sim_{d}", 0) for d in DIMENSIONS}
-    pie = _build_macro_bars(dim_totals, review_count,
-                            title="Dimension Strength Across All Reviews")
+    pool_label = "Premier Entities" if macro_pool_mode == "premier" else "All Reviews"
+    macro_title = f"Dimension Strength — {pool_label}"
+    macro_bar = _build_macro_bars(dim_totals, review_count, title=macro_title)
+    macro_spider = _build_macro_spider(dim_totals, review_count, title=macro_title)
 
     return (
-        _SHOW, pie,
+        _SHOW, macro_bar, macro_spider,
         _HIDE, empty_fig, empty_fig,
-        f"Macro View \u2014 Dimension Overview ({review_count:,} reviews)",
+        f"Macro View — Dimension Overview ({review_count:,} reviews, {pool_label})",
         [],
         _HIDE, _HIDE, [], None, _HIDE,
         "", {"display": "none"},
