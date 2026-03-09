@@ -1,0 +1,15 @@
+Wealthtender Advisor Review Analytics Dashboard
+Copyright 2026 Zan Merrill
+
+This product was developed as a capstone project in partnership with
+Wealthtender (https://wealthtender.com).
+
+If you use, modify, or redistribute this software, you must:
+  1. Retain this NOTICE file and the LICENSE file in all copies.
+  2. Provide clear attribution to the original author (Zan Merrill)
+     in any derivative work or deployment.
+  3. Note any modifications you have made.
+
+This software includes NLP-derived scoring methodologies using
+sentence-transformer embeddings and cosine similarity, developed
+specifically for financial advisor review analysis.

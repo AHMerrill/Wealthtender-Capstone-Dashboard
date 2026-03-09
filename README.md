@@ -2,7 +2,32 @@
 
 A two-service analytics platform that turns financial advisor client reviews into actionable dimension-level scores, benchmarks, and leaderboards using NLP-derived cosine similarity scoring.
 
-**Live:** [https://wt-dash.onrender.com](https://wt-dash.onrender.com) (Render free tier — may take ~30s to cold-start)
+**Live:** [https://wt-dash.onrender.com](https://wt-dash.onrender.com)
+
+> **Note:** The current Render deployment is temporary. The API and dashboard will need to be re-hosted on Wealthtender's own infrastructure (or any Docker-compatible platform) for long-term use. See [Deployment](#12-deployment) and [Integration Notes](#14-integration-notes-wordpress--embedding) for migration guidance.
+
+---
+
+## Downloading This Repository
+
+**With Git installed:**
+```bash
+git clone https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard.git
+```
+
+**Without Git / without a GitHub account:**
+
+Download the full repository as a ZIP file directly from your browser — no GitHub account required:
+
+1. Go to: [https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard](https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard)
+2. Click the green **"Code"** button near the top-right
+3. Select **"Download ZIP"**
+4. Extract the ZIP to your desired location
+
+Alternatively, download via direct link:
+```
+https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard/archive/refs/heads/main.zip
+```
 
 ---
 
@@ -18,11 +43,12 @@ A two-service analytics platform that turns financial advisor client reviews int
 8. [Requirements](#8-requirements)
 9. [Running Locally](#9-running-locally)
 10. [Docker Compose](#10-docker-compose)
-11. [Deployment](#11-deployment)
-12. [Auth & Security](#12-auth--security)
-13. [Integration Notes (WordPress / Embedding)](#13-integration-notes-wordpress--embedding)
-14. [Production Auth Upgrade Roadmap](#14-production-auth-upgrade-roadmap)
-15. [Key Links](#15-key-links)
+11. [License & Attribution](#11-license--attribution)
+12. [Deployment](#12-deployment)
+13. [Auth & Security](#13-auth--security)
+14. [Integration Notes (WordPress / Embedding)](#14-integration-notes-wordpress--embedding)
+15. [Production Auth Upgrade Roadmap](#15-production-auth-upgrade-roadmap)
+16. [Key Links](#16-key-links)
 
 ---
 
@@ -259,7 +285,7 @@ All settings have sensible defaults for local development — zero configuration
 | `API_BASE` | `http://localhost:8000` | Dashboard | URL the dashboard uses to reach the API |
 | `PORT` | `8050` / `8000` | Both | Listening port (Render injects automatically) |
 | `API_KEY` | *(empty — auth off)* | Both | Shared secret between services |
-| `ADMIN_PASSWORD` | `WT$msba2026` | Dashboard | Password for the admin portal |
+| `ADMIN_PASSWORD` | *(set in Render dashboard)* | Dashboard | Password for the admin portal |
 
 See `.env.example` for the full list with comments.
 
@@ -310,9 +336,24 @@ Dashboard at `http://localhost:8050`, API at `http://localhost:8000`.
 
 ---
 
-## 11. Deployment
+## 11. License & Attribution
 
-Both services are containerized and deploy to any Docker-compatible host.
+This project is licensed under the **Apache License 2.0** — see [LICENSE](./LICENSE) for the full text.
+
+**What this means:** You are free to use, modify, and redistribute this code, including for commercial purposes, provided you:
+
+- Retain the copyright notice and LICENSE file in all copies
+- Include the [NOTICE](./NOTICE) file in any distribution or derivative work
+- Clearly state any modifications you have made
+- Provide attribution to the original author (Zan Merrill)
+
+The NOTICE file contains the required attribution text. If you deploy a modified version, the NOTICE and LICENSE must travel with it.
+
+---
+
+## 12. Deployment
+
+Both services are containerized and deploy to any Docker-compatible host. **The current Render deployment is temporary** — when migrating to Wealthtender infrastructure, follow the same steps on any platform (AWS ECS, GCP Cloud Run, Railway, Fly.io, a WordPress-adjacent VPS, etc.).
 
 **Steps for any platform:**
 1. Deploy the API using `Dockerfile.api`
@@ -328,9 +369,11 @@ A `render.yaml` blueprint is included for Render. The project is currently deplo
 | `wt-api` | `https://wt-api-hdji.onrender.com` |
 | `wt-dash` | `https://wt-dash.onrender.com` |
 
+These URLs will change when the project is migrated off Render. Update `API_BASE` on the dashboard accordingly.
+
 ---
 
-## 12. Auth & Security
+## 13. Auth & Security
 
 ### API Key (service-to-service)
 The API rejects any request without a valid `X-API-Key` header. The dashboard sends this automatically. Both services read from `API_KEY` env var. Locally, `API_KEY` is empty so auth is skipped. `/api/health` is always open.
@@ -340,9 +383,9 @@ The splash page admin portal requires `ADMIN_PASSWORD`. The check is server-side
 
 ---
 
-## 13. Integration Notes (WordPress / Embedding)
+## 14. Integration Notes (WordPress / Embedding)
 
-The dashboard is a standalone web application. There are several ways to integrate it with an existing WordPress site:
+The API and dashboard are standalone services that need to be hosted somewhere accessible. The current Render deployment is a temporary development host — for production, Wealthtender will need to deploy both Docker containers to their own infrastructure. The dashboard is a standalone web application. There are several ways to integrate it with an existing WordPress site:
 
 ### Option A: iframe Embed (Simplest)
 Embed the entire dashboard (or specific pages) inside a WordPress page using an `<iframe>`:
@@ -373,7 +416,7 @@ Run the dashboard on a subdomain (e.g., `analytics.wealthtender.com`) and link t
 
 ---
 
-## 14. Production Auth Upgrade Roadmap
+## 15. Production Auth Upgrade Roadmap
 
 When Wealthtender's engineering team replaces the prototype auth:
 
@@ -396,7 +439,7 @@ When Wealthtender's engineering team replaces the prototype auth:
 
 ---
 
-## 15. Key Links
+## 16. Key Links
 
 | Resource | URL |
 |----------|-----|
@@ -407,4 +450,6 @@ When Wealthtender's engineering team replaces the prototype auth:
 | Project Log | [PROJECT_LOG.md](./PROJECT_LOG.md) |
 | Changelog | [CHANGELOG.md](./CHANGELOG.md) |
 | Data Contract | [data_contract/README.md](./data_contract/README.md) |
+| License | [LICENSE](./LICENSE) (Apache 2.0) |
+| Attribution Notice | [NOTICE](./NOTICE) |
 | Wealthtender | [wealthtender.com](https://wealthtender.com) |
