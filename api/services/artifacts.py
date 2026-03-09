@@ -108,6 +108,7 @@ class ArtifactStore:
         self.advisor_dim_scores = self._load_table("advisor_dimension_scores")
         self._dna_macro_cache: Optional[list] = None
         self._enrich_review_dim_scores()
+        self._enrich_advisor_review_counts()
 
         # Capabilities
         self.has_firms = (
@@ -356,6 +357,16 @@ class ArtifactStore:
                 scores[col] = scores["review_idx"].map(extra[col])
         self.review_dim_scores = scores
 
+    def _enrich_advisor_review_counts(self):
+        """Add review_count column to advisor_dim_scores from review-level data."""
+        if self.advisor_dim_scores.empty or self.review_dim_scores.empty:
+            return
+        counts = self.review_dim_scores.groupby("advisor_id").size().rename("review_count")
+        self.advisor_dim_scores = self.advisor_dim_scores.merge(
+            counts, on="advisor_id", how="left")
+        self.advisor_dim_scores["review_count"] = (
+            self.advisor_dim_scores["review_count"].fillna(0).astype(int))
+
     # ----------------------------------------------------------------------------------
     # Advisor DNA
     # ----------------------------------------------------------------------------------
@@ -426,8 +437,14 @@ class ArtifactStore:
             "scores": scores,
         }
 
-    def dna_percentile_scores(self, entity_id: str, method: str = "mean") -> Optional[Dict]:
-        """Percentile rank of this entity vs peers of the same type, per dimension."""
+    def dna_percentile_scores(self, entity_id: str, method: str = "mean",
+                              min_peer_reviews: int = 0) -> Optional[Dict]:
+        """Percentile rank of this entity vs peers of the same type, per dimension.
+
+        min_peer_reviews: if > 0, only include peers with at least this many
+        reviews in the comparison pool (premier benchmarking).  The target
+        entity is always included regardless of its own review count.
+        """
         if self.advisor_dim_scores.empty:
             return None
         all_df = self.advisor_dim_scores
@@ -436,22 +453,34 @@ class ArtifactStore:
             return None
         entity_type = match.iloc[0]["entity_type"]
         peers = all_df[all_df["entity_type"] == entity_type].copy()
+
+        # Premier filter: restrict peer pool but always keep the target entity
+        if min_peer_reviews > 0 and "review_count" in peers.columns:
+            peers = peers[
+                (peers["review_count"] >= min_peer_reviews) |
+                (peers["advisor_id"] == entity_id)
+            ]
+
         sim_cols = [f"sim_{method}_{d}" for d in self._SIM_DIMS]
         if any(c not in peers.columns for c in sim_cols):
             return None
-        pct_ranks = {}
         for d in self._SIM_DIMS:
             col = f"sim_{method}_{d}"
             peers[f"_pctrank_{d}"] = peers[col].rank(pct=True)
         entity_row = peers[peers["advisor_id"] == entity_id].iloc[0]
         scores = {d: round(float(entity_row[f"_pctrank_{d}"]) * 100, 1)
                   for d in self._SIM_DIMS}
+
+        # Include review_count and premier flag in response
+        entity_review_count = int(entity_row.get("review_count", 0))
         return {
             "advisor_id": entity_row["advisor_id"],
             "advisor_name": entity_row["advisor_name"],
             "entity_type": entity_type,
             "method": method,
             "peer_count": len(peers),
+            "review_count": entity_review_count,
+            "premier": entity_review_count >= 20,
             "scores": scores,
         }
 

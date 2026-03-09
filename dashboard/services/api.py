@@ -113,9 +113,12 @@ def get_dna_advisor_scores(entity_id: str, method: str = "mean") -> dict:
                 params={"entity_id": entity_id, "method": method}) or {}
 
 
-def get_dna_percentile_scores(entity_id: str, method: str = "mean") -> dict:
-    return _get("/api/advisor-dna/percentile-scores",
-                params={"entity_id": entity_id, "method": method}) or {}
+def get_dna_percentile_scores(entity_id: str, method: str = "mean",
+                              min_peer_reviews: int = 0) -> dict:
+    params = {"entity_id": entity_id, "method": method}
+    if min_peer_reviews > 0:
+        params["min_peer_reviews"] = min_peer_reviews
+    return _get("/api/advisor-dna/percentile-scores", params=params) or {}
 
 
 def get_dna_population_medians(method: str = "mean", entity_type: str = "firm") -> dict:

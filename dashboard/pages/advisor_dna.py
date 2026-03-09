@@ -492,7 +492,32 @@ def layout():
                                     ),
                                 ],
                             ),
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "8px"},
+                                children=[
+                                    html.Span("Pool:", style={
+                                        "fontSize": "12px", "color": COLORS["gray"],
+                                        "fontWeight": "600"}),
+                                    dcc.RadioItems(
+                                        id="dna-pool-toggle",
+                                        options=[
+                                            {"label": "All Peers", "value": "all"},
+                                            {"label": "Premier (20+ reviews)",
+                                             "value": "premier"},
+                                        ],
+                                        value="all", inline=True,
+                                        labelStyle={"fontSize": "12px",
+                                                    "marginRight": "12px"},
+                                    ),
+                                ],
+                            ),
                         ],
+                    ),
+                    # Confidence banner (shown/hidden dynamically)
+                    html.Div(
+                        id="dna-confidence-banner",
+                        style={"display": "none"},
                     ),
                     html.Div(
                         id="dna-ref-card",
@@ -691,29 +716,34 @@ def update_ref_card_and_mode(display_mode):
     Output("dna-review-selector", "options", allow_duplicate=True),
     Output("dna-review-selector", "value", allow_duplicate=True),
     Output("dna-query-detail", "style", allow_duplicate=True),
+    Output("dna-confidence-banner", "children"),
+    Output("dna-confidence-banner", "style"),
     Input("dna-current-view", "data"),
     Input("dna-entity-search", "value"),
     Input("dna-method-selector", "value"),
     Input("dna-display-toggle", "value"),
+    Input("dna-pool-toggle", "value"),
     State("dna-entity-type", "value"),
     prevent_initial_call=True,
 )
-def update_main_view(current_view, entity_id, method, display_mode, entity_type):
+def update_main_view(current_view, entity_id, method, display_mode, pool_mode, entity_type):
     import logging
     log = logging.getLogger(__name__)
     empty_fig = go.Figure()
     method = method or "mean"
     display_mode = display_mode or "percentile"
+    pool_mode = pool_mode or "all"
 
     try:
-        return _update_main_view_inner(entity_id, method, display_mode, entity_type)
+        return _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_type)
     except Exception:
         log.exception("update_main_view failed")
         return (_SHOW, empty_fig, _HIDE, empty_fig, empty_fig,
-                "Error loading view.", [], _HIDE, _HIDE, [], None, _HIDE)
+                "Error loading view.", [], _HIDE, _HIDE, [], None, _HIDE,
+                "", {"display": "none"})
 
 
-def _update_main_view_inner(entity_id, method, display_mode, entity_type):
+def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_type):
     empty_fig = go.Figure()
 
     if entity_id:
@@ -721,7 +751,8 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
         if not reviews:
             label = "No reviews found for this entity."
             return (_HIDE, empty_fig, _SHOW, empty_fig, empty_fig,
-                    label, [], _HIDE, _HIDE, [], None, _HIDE)
+                    label, [], _HIDE, _HIDE, [], None, _HIDE,
+                    "", {"display": "none"})
 
         name = reviews[0].get("advisor_name", entity_id)
         kind = "Firm" if entity_type == "firm" else "Advisor"
@@ -737,14 +768,54 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
         pctile_data = None
         bp_data = None
         et = entity_type or "firm"
+        min_peer = 20 if pool_mode == "premier" else 0
+        review_count_val = 0
+        is_premier = False
+
         if display_mode == "percentile":
-            pctile_resp = get_dna_percentile_scores(entity_id, method)
+            pctile_resp = get_dna_percentile_scores(entity_id, method,
+                                                    min_peer_reviews=min_peer)
             if pctile_resp and "scores" in pctile_resp:
                 pctile_data = pctile_resp["scores"]
+            review_count_val = pctile_resp.get("review_count", len(reviews)) if pctile_resp else len(reviews)
+            is_premier = pctile_resp.get("premier", False) if pctile_resp else False
             title = f"{name} \u2014 {method_label} (Percentile Rank)"
         else:
             bp_data = get_dna_method_breakpoints(method, et)
+            review_count_val = len(reviews)
             title = f"{name} \u2014 {method_label} Scores"
+
+        # --- Confidence banner ---
+        banner_children = ""
+        banner_style = {"display": "none"}
+        if review_count_val < 10:
+            banner_children = html.Div([
+                html.Span("\u26a0\ufe0f ", style={"fontSize": "1.1em"}),
+                html.Span(
+                    f"Directional only \u2014 based on {review_count_val} review{'s' if review_count_val != 1 else ''}. "
+                    "Scores may shift significantly as more reviews are collected.",
+                ),
+            ])
+            banner_style = {
+                "background": "#FFF3CD", "border": "1px solid #FFECB5",
+                "borderRadius": "6px", "padding": "10px 14px",
+                "marginBottom": "12px", "fontSize": "0.88rem",
+                "color": "#664D03",
+            }
+        elif review_count_val >= 20:
+            banner_children = html.Div([
+                html.Span("\u2b50 ", style={"fontSize": "1.1em"}),
+                html.Span(
+                    f"Premier entity \u2014 {review_count_val} reviews. "
+                    "High-confidence scores.",
+                ),
+            ])
+            banner_style = {
+                "background": "#D1E7DD", "border": "1px solid #BADBCC",
+                "borderRadius": "6px", "padding": "10px 14px",
+                "marginBottom": "12px", "fontSize": "0.88rem",
+                "color": "#0F5132",
+            }
 
         pie = _build_entity_bars(dim_scores, len(reviews), title=title,
                                  pctile_scores=pctile_data, breakpoints=bp_data)
@@ -757,12 +828,14 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
             f"{kind} View \u2014 {name} ({len(reviews)} reviews, {method_label})",
             reviews,
             _HIDE, _HIDE, [], None, _HIDE,
+            banner_children, banner_style,
         )
 
     macro_data = get_dna_macro_totals()
     if not macro_data or "totals" not in macro_data:
         return (_SHOW, empty_fig, _HIDE, empty_fig, empty_fig,
-                "Loading data...", [], _HIDE, _HIDE, [], None, _HIDE)
+                "Loading data...", [], _HIDE, _HIDE, [], None, _HIDE,
+                "", {"display": "none"})
 
     raw_totals = macro_data["totals"]
     review_count = macro_data.get("review_count", 0)
@@ -776,6 +849,7 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
         f"Macro View \u2014 Dimension Overview ({review_count:,} reviews)",
         [],
         _HIDE, _HIDE, [], None, _HIDE,
+        "", {"display": "none"},
     )
 
 

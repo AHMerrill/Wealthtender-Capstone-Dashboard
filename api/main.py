@@ -241,8 +241,9 @@ def advisor_dna_advisor_scores(
 def advisor_dna_percentile_scores(
     entity_id: str = Query(...),
     method: Literal["mean", "penalized", "weighted"] = "mean",
+    min_peer_reviews: int = Query(0, ge=0),
 ):
-    scores = store.dna_percentile_scores(entity_id, method)
+    scores = store.dna_percentile_scores(entity_id, method, min_peer_reviews)
     if scores is None:
         raise HTTPException(status_code=404, detail="entity or method not found")
     return scores
