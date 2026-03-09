@@ -805,7 +805,6 @@ def merge_stopwords(defaults_checked, extras_selected, exclude_checked):
 # ---------- Content-shell layout mode ----------
 
 @callback(
-    Output("content-shell", "style"),
     Output("eda-shell", "style"),
     Output("page-shell", "style"),
     Output("access-denied", "style"),
@@ -819,19 +818,19 @@ def toggle_content(pathname, user_role_data):
     hide = {"display": "none"}
     show = {"display": "block"}
 
-    # Splash / no role: single-column, show page-shell (splash), hide EDA
+    # Splash / no role: show page-shell (splash), hide EDA
     if not role or pathname == "/":
-        return {"display": "block", "padding": "0"}, hide, show, hide, None
+        return hide, show, hide, None
 
     allowed = pages_for_role(role)
 
     # EDA: show eda-shell, hide page-shell
     if pathname == "/eda" and "/eda" in allowed:
-        return {}, show, hide, hide, None
+        return show, hide, hide, None
 
     # Other allowed pages: hide eda-shell, show page-shell
     if pathname in allowed:
-        return {}, hide, show, hide, None
+        return hide, show, hide, None
 
     # Access denied
     denied = html.Div([
@@ -840,8 +839,8 @@ def toggle_content(pathname, user_role_data):
         html.P(children=["Return to ", dcc.Link("Home", href="/"),
                           " to switch roles."]),
     ])
-    return {}, hide, hide, {"display": "block", "padding": "40px",
-                             "textAlign": "center"}, denied
+    return hide, hide, {"display": "block", "padding": "40px",
+                         "textAlign": "center"}, denied
 
 
 # ---------- EDA sidebar callbacks ----------
