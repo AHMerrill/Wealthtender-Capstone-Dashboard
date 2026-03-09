@@ -395,11 +395,22 @@ app.layout = html.Div(
                                 html.Div(className="filter-group",
                                          style={"marginTop": "8px"}, children=[
                                     html.Div("Select Entity", className="filter-label"),
+                                    dcc.RadioItems(
+                                        id="dna-premier-filter",
+                                        options=[
+                                            {"label": "All", "value": "all"},
+                                            {"label": "Premier (20+)", "value": "premier"},
+                                        ],
+                                        value="all", inline=True,
+                                        labelStyle={"fontSize": "11px",
+                                                    "marginRight": "10px"},
+                                    ),
                                     dcc.Dropdown(
                                         id="dna-entity-search",
                                         placeholder="Search...",
                                         searchable=True,
                                         clearable=True,
+                                        style={"marginTop": "6px"},
                                     ),
                                 ]),
                                 html.Div(
@@ -879,27 +890,35 @@ def reset_date_range_to_max(n_clicks):
     Output("dna-entity-search", "options"),
     Output("dna-entity-search", "value"),
     Input("dna-entity-type", "value"),
+    Input("dna-premier-filter", "value"),
     Input("dna-reset-btn", "n_clicks"),
     Input("url", "pathname"),
 )
-def update_dna_entity_options(entity_type, reset_clicks, pathname):
+def update_dna_entity_options(entity_type, premier_filter, reset_clicks, pathname):
     ctx = dash.callback_context
     trigger = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else ""
 
     clear_value = trigger == "dna-reset-btn"
 
     entity_type = entity_type or "firm"
+    premier_filter = premier_filter or "all"
     entities = get_dna_entities()
     if entity_type == "firm":
         items = entities.get("firms", [])
     else:
         items = entities.get("advisors", [])
 
+    if premier_filter == "premier":
+        items = [e for e in items if e.get("review_count", 0) >= 20]
+
     max_len = 60
     options = []
     for e in items:
         full_name = e.get("advisor_name", e.get("advisor_id", ""))
-        label = (full_name[:max_len] + "\u2026") if len(full_name) > max_len else full_name
+        rc = e.get("review_count", 0)
+        suffix = f" ({rc})" if rc else ""
+        display = full_name + suffix
+        label = (display[:max_len] + "\u2026") if len(display) > max_len else display
         options.append({
             "label": label,
             "value": e.get("advisor_id", ""),

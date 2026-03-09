@@ -197,7 +197,8 @@ def _build_entity_bars(dim_scores, review_count, title="Dimension Strength",
     return fig
 
 
-def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None):
+def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None,
+                         title="Dimension Profile"):
     """Radar / spider chart for entity view — works with percentile or raw scores."""
     short_labels = [_DIM_SHORT_LABELS[d] for d in DIMENSIONS]
     colors_list = [DIM_COLORS[d] for d in DIMENSIONS]
@@ -206,7 +207,7 @@ def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None):
         values = [pctile_scores.get(d, 50) for d in DIMENSIONS]
         radial_range = [0, 100]
         radial_title = "Percentile"
-        chart_title = "Dimension Profile — Spider"
+        chart_title = title
         tier_fn = _pctile_tier
         value_fmt = lambda v: f"{v:.0f}th"
         hovers = [
@@ -221,7 +222,7 @@ def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None):
         max_val = max(values) if values else 0.6
         radial_range = [0, max(0.8, max_val * 1.2)]
         radial_title = "Similarity"
-        chart_title = "Dimension Profile — Spider"
+        chart_title = title
         tier_fn = lambda v, d=None: _score_tier(v, bp.get(d) if d else None)
         value_fmt = lambda v: f"{v:.3f}"
         hovers = [
@@ -473,7 +474,7 @@ def layout():
                 id="dna-entity-section",
                 style=_HIDE,
                 children=[
-                    # Display mode toggle + reference card
+                    # Controls row: display mode, comparison pool, chart type
                     html.Div(
                         style={"display": "flex", "justifyContent": "space-between",
                                "alignItems": "center", "marginBottom": "12px",
@@ -502,7 +503,7 @@ def layout():
                                 style={"display": "flex", "alignItems": "center",
                                        "gap": "8px"},
                                 children=[
-                                    html.Span("Pool:", style={
+                                    html.Span("Comparison Pool:", style={
                                         "fontSize": "12px", "color": COLORS["gray"],
                                         "fontWeight": "600"}),
                                     dcc.RadioItems(
@@ -512,7 +513,26 @@ def layout():
                                             {"label": "Premier (20+ reviews)",
                                              "value": "premier"},
                                         ],
-                                        value="all", inline=True,
+                                        value="premier", inline=True,
+                                        labelStyle={"fontSize": "12px",
+                                                    "marginRight": "12px"},
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                style={"display": "flex", "alignItems": "center",
+                                       "gap": "8px"},
+                                children=[
+                                    html.Span("Chart:", style={
+                                        "fontSize": "12px", "color": COLORS["gray"],
+                                        "fontWeight": "600"}),
+                                    dcc.RadioItems(
+                                        id="dna-chart-type-toggle",
+                                        options=[
+                                            {"label": "Bar", "value": "bar"},
+                                            {"label": "Spider", "value": "spider"},
+                                        ],
+                                        value="bar", inline=True,
                                         labelStyle={"fontSize": "12px",
                                                     "marginRight": "12px"},
                                     ),
@@ -531,35 +551,20 @@ def layout():
                             html.Div(id="dna-ref-card-content"),
                         ],
                     ),
-                    html.Div(
-                        style={"display": "flex", "gap": "16px",
-                               "flexWrap": "wrap", "alignItems": "stretch"},
-                        children=[
-                            html.Div(
-                                style={"flex": "1", "minWidth": "420px"},
-                                children=[
-                                    dcc.Graph(
-                                        id="dna-entity-chart",
-                                        figure=go.Figure(),
-                                        config={"displayModeBar": False},
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                style={"flex": "1", "minWidth": "380px"},
-                                children=[
-                                    dcc.Graph(
-                                        id="dna-entity-spider",
-                                        figure=go.Figure(),
-                                        config={
-                                            "displayModeBar": False,
-                                            "scrollZoom": False,
-                                            "doubleClick": False,
-                                        },
-                                    ),
-                                ],
-                            ),
-                        ],
+                    dcc.Graph(
+                        id="dna-entity-chart",
+                        figure=go.Figure(),
+                        config={"displayModeBar": False},
+                    ),
+                    dcc.Graph(
+                        id="dna-entity-spider",
+                        figure=go.Figure(),
+                        config={
+                            "displayModeBar": False,
+                            "scrollZoom": False,
+                            "doubleClick": False,
+                        },
+                        style={"display": "none"},
                     ),
                     _desc_grid("entity"),
                     # Attribute detail: definition + review list
@@ -729,6 +734,19 @@ def update_ref_card_and_mode(display_mode):
 
 
 @callback(
+    Output("dna-entity-chart", "style"),
+    Output("dna-entity-spider", "style"),
+    Input("dna-chart-type-toggle", "value"),
+    prevent_initial_call=True,
+)
+def toggle_chart_type(chart_type):
+    chart_type = chart_type or "bar"
+    if chart_type == "spider":
+        return {"display": "none"}, {"display": "block"}
+    return {"display": "block"}, {"display": "none"}
+
+
+@callback(
     Output("dna-macro-section", "style"),
     Output("dna-macro-chart", "figure"),
     Output("dna-entity-section", "style"),
@@ -757,7 +775,7 @@ def update_main_view(current_view, entity_id, method, display_mode, pool_mode, e
     empty_fig = go.Figure()
     method = method or "mean"
     display_mode = display_mode or "percentile"
-    pool_mode = pool_mode or "all"
+    pool_mode = pool_mode or "premier"
 
     try:
         return _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_type)
@@ -845,7 +863,7 @@ def _update_main_view_inner(entity_id, method, display_mode, pool_mode, entity_t
         bars = _build_entity_bars(dim_scores, len(reviews), title=title,
                                   pctile_scores=pctile_data, breakpoints=bp_data)
         spider = _build_entity_spider(dim_scores, pctile_scores=pctile_data,
-                                      breakpoints=bp_data)
+                                      breakpoints=bp_data, title=title)
 
         return (
             _HIDE, empty_fig,

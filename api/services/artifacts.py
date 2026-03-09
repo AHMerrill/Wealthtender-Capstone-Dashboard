@@ -402,9 +402,15 @@ class ArtifactStore:
     def dna_entity_list(self) -> Dict[str, list]:
         if self.advisor_dim_scores.empty:
             return {"firms": [], "advisors": []}
-        df = self.advisor_dim_scores[["advisor_id", "advisor_name", "entity_type"]].drop_duplicates()
-        firms = _sanitize_records(df[df["entity_type"] == "firm"][["advisor_id", "advisor_name"]])
-        advisors = _sanitize_records(df[df["entity_type"] == "advisor"][["advisor_id", "advisor_name"]])
+        cols = ["advisor_id", "advisor_name", "entity_type"]
+        if "review_count" in self.advisor_dim_scores.columns:
+            cols.append("review_count")
+        df = self.advisor_dim_scores[cols].drop_duplicates()
+        out_cols = ["advisor_id", "advisor_name"]
+        if "review_count" in df.columns:
+            out_cols.append("review_count")
+        firms = _sanitize_records(df[df["entity_type"] == "firm"][out_cols])
+        advisors = _sanitize_records(df[df["entity_type"] == "advisor"][out_cols])
         return {"firms": firms, "advisors": advisors}
 
     def dna_entity_reviews(self, entity_id: str) -> Optional[list]:
