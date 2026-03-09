@@ -906,7 +906,7 @@ def toggle_macro_chart_type(chart_type):
     Input("dna-pool-toggle", "value"),
     Input("dna-macro-pool-toggle", "value"),
     State("dna-entity-type", "value"),
-    prevent_initial_call=True,
+    prevent_initial_call=False,
 )
 def update_main_view(current_view, entity_id, method, display_mode, pool_mode,
                      macro_pool_mode, entity_type):
