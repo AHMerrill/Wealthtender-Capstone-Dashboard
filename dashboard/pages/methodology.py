@@ -1,8 +1,7 @@
 import dash
-from dash import html, dcc, callback, Input, Output, State, no_update, ALL
-import json
+from dash import html, dcc, callback, Input, Output, ALL
 
-from dashboard.branding import COLORS, FONT_FAMILY
+from dashboard.branding import COLORS
 
 dash.register_page(__name__, path="/methodology", title="Methodology")
 

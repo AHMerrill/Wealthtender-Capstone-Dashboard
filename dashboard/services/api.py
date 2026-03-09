@@ -72,14 +72,6 @@ def get_firms() -> list:
     return _get("/api/firms") or []
 
 
-def get_firm_summary(firm_id: str) -> dict:
-    return _get(f"/api/firm/{firm_id}/summary") or {}
-
-
-def get_firm_dimensions(firm_id: str) -> list:
-    return _get(f"/api/firm/{firm_id}/dimensions") or []
-
-
 def get_stopwords() -> list:
     return _get("/api/stopwords") or []
 
@@ -90,10 +82,6 @@ def get_eda_charts(params: dict) -> dict:
 
 def get_review_detail(review_id: str) -> dict:
     return _get(f"/api/reviews/{review_id}") or {}
-
-
-def get_dna_macro() -> list:
-    return _get("/api/advisor-dna/macro") or []
 
 
 def get_dna_macro_totals(min_peer_reviews: int = 0) -> dict:
@@ -122,11 +110,6 @@ def get_dna_percentile_scores(entity_id: str, method: str = "mean",
     if min_peer_reviews > 0:
         params["min_peer_reviews"] = min_peer_reviews
     return _get("/api/advisor-dna/percentile-scores", params=params) or {}
-
-
-def get_dna_population_medians(method: str = "mean", entity_type: str = "firm") -> dict:
-    return _get("/api/advisor-dna/population-medians",
-                params={"method": method, "entity_type": entity_type}) or {}
 
 
 def get_dna_method_breakpoints(method: str = "mean", entity_type: str = "firm") -> dict:

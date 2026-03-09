@@ -506,28 +506,6 @@ a {{ color: var(--wt-blue); text-decoration: none; }}
   cursor: not-allowed;
 }}
 
-/* Legacy nav cards (kept for potential reuse) */
-.splash-nav-card {{
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  background: var(--wt-soft-lavender);
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  text-decoration: none;
-  color: var(--wt-ink);
-  font-weight: 600;
-  font-size: 14px;
-  transition: box-shadow 0.15s, transform 0.15s;
-}}
-
-.splash-nav-card:hover {{
-  box-shadow: 0 4px 12px rgba(28, 65, 125, 0.12);
-  transform: translateY(-2px);
-}}
-
 /* Sign out link in nav */
 .sign-out-link {{
   color: var(--wt-gray) !important;

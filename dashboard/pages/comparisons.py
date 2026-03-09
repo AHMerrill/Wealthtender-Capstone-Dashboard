@@ -8,10 +8,11 @@ Note: Partner group associations and data are mocked for development.
 """
 
 import dash
-from dash import html, dcc, callback, Input, Output, State, no_update
+from dash import html, dcc, callback, Input, Output
 import plotly.graph_objects as go
 
 from dashboard.branding import COLORS, DATA_VIZ_PALETTE, FONT_FAMILY
+from dashboard.constants import DIMENSIONS, DIM_LABELS, DIM_SHORT
 from dashboard.services.api import (
     get_partner_groups,
     get_partner_group_members,
@@ -20,33 +21,6 @@ from dashboard.services.api import (
 )
 
 dash.register_page(__name__, path="/comparisons", title="Comparisons")
-
-DIMENSIONS = [
-    "trust_integrity",
-    "listening_personalization",
-    "communication_clarity",
-    "responsiveness_availability",
-    "life_event_support",
-    "investment_expertise",
-]
-
-DIM_LABELS = {
-    "trust_integrity": "Trust & Integrity",
-    "listening_personalization": "Customer Empathy & Personalization",
-    "communication_clarity": "Communication Clarity",
-    "responsiveness_availability": "Responsiveness",
-    "life_event_support": "Life Event Support",
-    "investment_expertise": "Investment Expertise",
-}
-
-DIM_SHORT = {
-    "trust_integrity": "Trust",
-    "listening_personalization": "Empathy",
-    "communication_clarity": "Clarity",
-    "responsiveness_availability": "Responsive",
-    "life_event_support": "Life Events",
-    "investment_expertise": "Expertise",
-}
 
 
 def _empty_fig(message="No data available", height=320):

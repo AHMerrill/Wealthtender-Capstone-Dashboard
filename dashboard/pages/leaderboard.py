@@ -8,42 +8,14 @@ Features:
 """
 
 import dash
-from dash import html, dcc, callback, Input, Output, State, no_update, ctx
+from dash import html, dcc, callback, Input, Output, State, no_update
 import plotly.graph_objects as go
 
-from dashboard.branding import COLORS, DATA_VIZ_PALETTE, FONT_FAMILY
+from dashboard.branding import COLORS, FONT_FAMILY
+from dashboard.constants import DIMENSIONS, DIM_LABELS, DIM_SHORT, DIM_COLORS
 from dashboard.services.api import get_leaderboard, get_dna_advisor_scores
 
 dash.register_page(__name__, path="/leaderboard", title="Leaderboard")
-
-DIMENSIONS = [
-    "trust_integrity",
-    "listening_personalization",
-    "communication_clarity",
-    "responsiveness_availability",
-    "life_event_support",
-    "investment_expertise",
-]
-
-DIM_LABELS = {
-    "trust_integrity": "Trust & Integrity",
-    "listening_personalization": "Customer Empathy & Personalization",
-    "communication_clarity": "Communication Clarity",
-    "responsiveness_availability": "Responsiveness",
-    "life_event_support": "Life Event Support",
-    "investment_expertise": "Investment Expertise",
-}
-
-DIM_SHORT = {
-    "trust_integrity": "Trust",
-    "listening_personalization": "Empathy",
-    "communication_clarity": "Clarity",
-    "responsiveness_availability": "Responsive",
-    "life_event_support": "Life Events",
-    "investment_expertise": "Expertise",
-}
-
-DIM_COLORS = {dim: DATA_VIZ_PALETTE[i] for i, dim in enumerate(DIMENSIONS[:6])}
 
 COMPARE_COLORS = [COLORS["blue"], "#D4376E"]
 
