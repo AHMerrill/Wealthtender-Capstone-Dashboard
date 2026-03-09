@@ -271,36 +271,45 @@ def _build_profile_bars(dim_scores, pctile_scores=None, breakpoints=None):
     return fig
 
 
+_DIM_SHORT_LABELS = {
+    "trust_integrity": "Trust",
+    "listening_personalization": "Empathy",
+    "communication_clarity": "Clarity",
+    "responsiveness_availability": "Responsive",
+    "life_event_support": "Life Events",
+    "investment_expertise": "Expertise",
+}
+
+
 def _build_radar_figure(scores, title="Dimension Scores"):
-    labels = [DIM_LABELS[d] for d in DIMENSIONS]
+    short_labels = [_DIM_SHORT_LABELS[d] for d in DIMENSIONS]
     values = [scores.get(d, 0) or 0 for d in DIMENSIONS]
     colors_list = [DIM_COLORS[d] for d in DIMENSIONS]
     values_closed = values + [values[0]]
-    labels_closed = labels + [labels[0]]
+    short_labels_closed = short_labels + [short_labels[0]]
 
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
-        r=values_closed, theta=labels_closed,
+        r=values_closed, theta=short_labels_closed,
         fill="toself",
         line=dict(color=COLORS["blue"], width=2),
         fillcolor="rgba(0, 76, 140, 0.08)",
         hoverinfo="skip", showlegend=False,
+        name="",
     ))
     for i, d in enumerate(DIMENSIONS):
         tier = _score_tier(values[i])
         fig.add_trace(go.Scatterpolar(
-            r=[values[i]], theta=[labels[i]],
-            mode="markers+text",
+            r=[values[i]], theta=[short_labels[i]],
+            mode="markers",
             marker=dict(color=colors_list[i], size=10, symbol="circle"),
-            text=[f"{values[i]:.2f} ({tier})"],
-            textposition="top center",
-            textfont=dict(size=10, color=colors_list[i], family=FONT_FAMILY),
             hovertemplate=(
                 f"<b>{DIM_LABELS[d]}</b><br>"
                 f"Cosine Similarity: {values[i]:.3f}<br>"
                 f"Tier: {tier}<extra></extra>"
             ),
-            showlegend=False,
+            showlegend=True,
+            name=f"{DIM_LABELS[d]}: {values[i]:.2f} ({tier})",
         ))
 
     fig.update_layout(
@@ -312,12 +321,17 @@ def _build_radar_figure(scores, title="Dimension Scores"):
                             linecolor=COLORS["border"]),
             angularaxis=dict(gridcolor=COLORS["border"],
                              linecolor=COLORS["border"],
-                             tickfont=dict(size=11)),
+                             tickfont=dict(size=12, family=FONT_FAMILY)),
             bgcolor="white",
         ),
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5,
+            font=dict(size=10, family=FONT_FAMILY),
+            itemwidth=30,
+        ),
         title=dict(text=title, font=dict(size=14, color=COLORS["ink"])),
-        margin=dict(l=60, r=60, t=50, b=40), height=400,
+        margin=dict(l=60, r=60, t=50, b=100), height=480,
         paper_bgcolor="white", plot_bgcolor="white",
     )
     return fig
@@ -582,7 +596,11 @@ def layout():
                                             dcc.Graph(
                                                 id="dna-review-radar",
                                                 figure=go.Figure(),
-                                                config={"displayModeBar": False},
+                                                config={
+                                                    "displayModeBar": False,
+                                                    "scrollZoom": False,
+                                                    "doubleClick": False,
+                                                },
                                             ),
                                         ],
                                     ),
