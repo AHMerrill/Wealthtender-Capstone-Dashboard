@@ -92,95 +92,107 @@ def _pctile_tier(pctile: float) -> str:
     return _TIER_LABELS[3]
 
 
-def _build_macro_pie(dim_totals, review_count, title="Dimension Strength"):
-    """Macro pie — wedge labels show rank ordering (#1, #2, ...), no tiers."""
+def _build_macro_bars(dim_totals, review_count, title="Dimension Strength"):
+    """Macro horizontal bar chart — sorted by total score, rank labels."""
     ranked = sorted(DIMENSIONS, key=lambda d: dim_totals.get(d, 0), reverse=True)
     rank_map = {d: i + 1 for i, d in enumerate(ranked)}
 
-    labels = [DIM_LABELS[d] for d in DIMENSIONS]
-    values = [dim_totals.get(d, 0) for d in DIMENSIONS]
-    colors = [DIM_COLORS[d] for d in DIMENSIONS]
-    ranks = [f"#{rank_map[d]}" for d in DIMENSIONS]
+    # Sort ascending so highest bar is at the top of the chart
+    dims_sorted = list(reversed(ranked))
+    labels = [DIM_LABELS[d] for d in dims_sorted]
+    values = [dim_totals.get(d, 0) for d in dims_sorted]
+    bar_colors = [DIM_COLORS[d] for d in dims_sorted]
+    text_labels = [f"#{rank_map[d]}" for d in dims_sorted]
     hovers = [
         f"<b>{DIM_LABELS[d]}</b> (Rank {rank_map[d]})<br><br>"
         f"<i>{DIM_DESCRIPTIONS[d]}</i>"
-        for d in DIMENSIONS
+        for d in dims_sorted
     ]
 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels, values=values,
-        marker=dict(colors=colors, line=dict(color="white", width=2)),
-        pull=[0.05] * len(DIMENSIONS),
-        textinfo="label+text", text=ranks,
-        textposition="outside",
-        textfont=dict(size=13, family=FONT_FAMILY, color=COLORS["ink"]),
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=labels, x=values, orientation="h",
+        marker=dict(color=bar_colors),
+        text=text_labels, textposition="outside",
+        textfont=dict(size=12, family=FONT_FAMILY),
         hovertext=hovers, hoverinfo="text",
-        hole=0.35, sort=False,
-    )])
+    ))
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
-        showlegend=False,
-        margin=dict(l=40, r=40, t=50, b=20), height=480,
+        margin=dict(l=10, r=60, t=50, b=40), height=400,
         paper_bgcolor="white", plot_bgcolor="white",
-        title=dict(text=title, font=dict(size=16, color=COLORS["navy"]), x=0.5),
-        annotations=[dict(
-            text=f"<b>{review_count:,}</b><br>reviews",
-            x=0.5, y=0.5, font_size=14, showarrow=False,
-            font=dict(family=FONT_FAMILY, color=COLORS["gray"]),
-        )],
+        title=dict(text=f"{title}  ({review_count:,} reviews)",
+                   font=dict(size=16, color=COLORS["navy"]), x=0.5),
+        xaxis=dict(title="Aggregate Score", showgrid=True,
+                   gridcolor="#f0f0f0"),
+        yaxis=dict(automargin=True),
+        bargap=0.25,
     )
     return fig
 
 
-def _build_entity_pie(dim_scores, review_count, title="Dimension Strength",
-                      pctile_scores=None, breakpoints=None):
-    """Entity pie — shows tier labels (raw mode) or percentile (pctile mode)."""
-    labels = [DIM_LABELS[d] for d in DIMENSIONS]
-    values = [dim_scores.get(d, 0) for d in DIMENSIONS]
-    colors = [DIM_COLORS[d] for d in DIMENSIONS]
-
+def _build_entity_bars(dim_scores, review_count, title="Dimension Strength",
+                       pctile_scores=None, breakpoints=None):
+    """Entity horizontal bar chart — sorted by score, shows tier or percentile."""
     if pctile_scores:
-        annotations = [f"{pctile_scores.get(d, 0):.0f}th pctl" for d in DIMENSIONS]
+        dims_sorted = sorted(DIMENSIONS,
+                             key=lambda d: pctile_scores.get(d, 50), reverse=True)
+        values = [pctile_scores.get(d, 50) for d in dims_sorted]
+        tiers = [_pctile_tier(v) for v in values]
+        text_labels = [f"{v:.0f}th — {t}" for v, t in zip(values, tiers)]
+        x_title = "Percentile Rank Among Peers"
+        x_range = [0, 115]
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
-            f"Percentile: {pctile_scores.get(d, 0):.0f}th<br>"
-            f"Tier: {_pctile_tier(pctile_scores.get(d, 0))}<br><br>"
+            f"Percentile: {pctile_scores.get(d, 50):.0f}th<br>"
+            f"Tier: {_pctile_tier(pctile_scores.get(d, 50))}<br><br>"
             f"<i>{DIM_DESCRIPTIONS[d]}</i>"
-            for d in DIMENSIONS
+            for d in dims_sorted
         ]
     else:
         bp = breakpoints or {}
-        annotations = [_score_tier(dim_scores.get(d, 0), bp.get(d))
-                        for d in DIMENSIONS]
+        dims_sorted = sorted(DIMENSIONS,
+                             key=lambda d: dim_scores.get(d, 0), reverse=True)
+        values = [dim_scores.get(d, 0) for d in dims_sorted]
+        tiers = [_score_tier(v, bp.get(d)) for v, d in zip(values, dims_sorted)]
+        text_labels = [f"{v:.3f} — {t}" for v, t in zip(values, tiers)]
+        x_title = "Cosine Similarity"
+        x_range = None
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
             f"Similarity: {dim_scores.get(d, 0):.3f}<br>"
-            f"Tier: {annotations[i]}<br><br>"
+            f"Tier: {_score_tier(dim_scores.get(d, 0), bp.get(d))}<br><br>"
             f"<i>{DIM_DESCRIPTIONS[d]}</i>"
-            for i, d in enumerate(DIMENSIONS)
+            for d in dims_sorted
         ]
 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels, values=values,
-        marker=dict(colors=colors, line=dict(color="white", width=2)),
-        pull=[0.05] * len(DIMENSIONS),
-        textinfo="label+text", text=annotations,
-        textposition="outside",
-        textfont=dict(size=13, family=FONT_FAMILY, color=COLORS["ink"]),
+    # Reverse for display so highest is at top
+    dims_sorted = list(reversed(dims_sorted))
+    values = list(reversed(values))
+    text_labels = list(reversed(text_labels))
+    hovers = list(reversed(hovers))
+
+    labels = [DIM_LABELS[d] for d in dims_sorted]
+    bar_colors = [DIM_COLORS[d] for d in dims_sorted]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=labels, x=values, orientation="h",
+        marker=dict(color=bar_colors),
+        text=text_labels, textposition="outside",
+        textfont=dict(size=12, family=FONT_FAMILY),
         hovertext=hovers, hoverinfo="text",
-        hole=0.35, sort=False,
-    )])
+    ))
     fig.update_layout(
         font=dict(family=FONT_FAMILY, color=COLORS["ink"]),
-        showlegend=False,
-        margin=dict(l=40, r=40, t=50, b=20), height=480,
+        margin=dict(l=10, r=80, t=50, b=40), height=400,
         paper_bgcolor="white", plot_bgcolor="white",
-        title=dict(text=title, font=dict(size=16, color=COLORS["navy"]), x=0.5),
-        annotations=[dict(
-            text=f"<b>{review_count:,}</b><br>reviews",
-            x=0.5, y=0.5, font_size=14, showarrow=False,
-            font=dict(family=FONT_FAMILY, color=COLORS["gray"]),
-        )],
+        title=dict(text=f"{title}  ({review_count:,} reviews)",
+                   font=dict(size=16, color=COLORS["navy"]), x=0.5),
+        xaxis=dict(title=x_title, showgrid=True, gridcolor="#f0f0f0",
+                   range=x_range),
+        yaxis=dict(automargin=True),
+        bargap=0.25,
     )
     return fig
 
@@ -716,8 +728,8 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
             bp_data = get_dna_method_breakpoints(method, et)
             title = f"{name} \u2014 {method_label} Scores"
 
-        pie = _build_entity_pie(dim_scores, len(reviews), title=title,
-                                pctile_scores=pctile_data, breakpoints=bp_data)
+        pie = _build_entity_bars(dim_scores, len(reviews), title=title,
+                                 pctile_scores=pctile_data, breakpoints=bp_data)
         profile_bars = _build_profile_bars(dim_scores, pctile_scores=pctile_data,
                                            breakpoints=bp_data)
 
@@ -737,8 +749,8 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
     raw_totals = macro_data["totals"]
     review_count = macro_data.get("review_count", 0)
     dim_totals = {d: raw_totals.get(f"sim_{d}", 0) for d in DIMENSIONS}
-    pie = _build_macro_pie(dim_totals, review_count,
-                           title="Dimension Strength Across All Reviews")
+    pie = _build_macro_bars(dim_totals, review_count,
+                            title="Dimension Strength Across All Reviews")
 
     return (
         _SHOW, pie,
@@ -750,7 +762,7 @@ def _update_main_view_inner(entity_id, method, display_mode, entity_type):
 
 
 # ---------------------------------------------------------------------------
-# Macro: pie wedge click OR card click -> show query text
+# Macro: bar click OR card click -> show query text
 # ---------------------------------------------------------------------------
 
 def _query_panel_output(dim_key):
@@ -773,7 +785,7 @@ def _query_panel_output(dim_key):
     Input({"type": "macro-dim-card", "dim": ALL}, "n_clicks"),
     prevent_initial_call=True,
 )
-def show_macro_query(pie_click, card_clicks):
+def show_macro_query(bar_click, card_clicks):
     ctx = dash.callback_context
     if not ctx.triggered:
         return no_update, no_update, no_update
@@ -781,12 +793,13 @@ def show_macro_query(pie_click, card_clicks):
     trigger = ctx.triggered[0]["prop_id"]
 
     if "dna-macro-chart" in trigger:
-        if not pie_click:
+        if not bar_click:
             return no_update, no_update, no_update
-        points = pie_click.get("points", [])
+        points = bar_click.get("points", [])
         if not points:
             return no_update, no_update, no_update
-        label = points[0].get("label", "")
+        # Bar chart returns dimension label in 'y' (horizontal bars)
+        label = points[0].get("y", "") or points[0].get("label", "")
         dim_key = _DIM_LABEL_TO_KEY.get(label)
     else:
         import json as _json
