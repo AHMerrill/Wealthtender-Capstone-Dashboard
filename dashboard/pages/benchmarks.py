@@ -294,7 +294,7 @@ def layout():
                                 {"label": "All", "value": "all"},
                                 {"label": "Premier (20+ reviews)", "value": "premier"},
                             ],
-                            value="all",
+                            value="premier",
                             style={"fontSize": "12px"},
                         ),
                     ]),
@@ -428,7 +428,9 @@ def fetch_benchmark_data(trigger, method, entity_type, pool):
     """Fetch pool stats, distributions, and entity list."""
     min_peer_reviews = 20 if pool == "premier" else 0
 
-    pool_stats = get_benchmark_pool_stats(min_peer_reviews=min_peer_reviews)
+    # Always fetch pool stats with default threshold so BOTH All and Premier
+    # KPI cards are always populated (avoids cards appearing/disappearing).
+    pool_stats = get_benchmark_pool_stats()
     distributions = get_benchmark_distributions(
         method=method, entity_type=entity_type, min_peer_reviews=min_peer_reviews
     )

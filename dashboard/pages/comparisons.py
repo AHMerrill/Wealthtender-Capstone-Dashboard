@@ -49,188 +49,263 @@ DIM_SHORT = {
 }
 
 
-def _empty_fig(message="No data available"):
+def _empty_fig(message="No data available", height=320):
     fig = go.Figure()
     fig.add_annotation(
         text=message, xref="paper", yref="paper", x=0.5, y=0.5,
         showarrow=False, font={"size": 14, "color": COLORS["gray"]})
-    fig.update_layout(height=350, paper_bgcolor="white", plot_bgcolor="white",
-                      margin=dict(l=20, r=20, t=20, b=20))
+    fig.update_layout(
+        height=height, paper_bgcolor="white", plot_bgcolor="white",
+        margin=dict(l=20, r=20, t=20, b=20),
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+    )
     return fig
 
 
+# ---------------------------------------------------------------------------
+# Section card helper
+# ---------------------------------------------------------------------------
+
+def _section_card(title, subtitle, bg_color, children):
+    """Wrap content in a visually distinct section card."""
+    return html.Div(
+        style={
+            "padding": "28px",
+            "backgroundColor": bg_color,
+            "borderRadius": "10px",
+            "marginBottom": "32px",
+        },
+        children=[
+            html.H2(title, style={
+                "marginTop": "0", "marginBottom": "6px", "fontSize": "22px",
+                "fontWeight": "700", "color": COLORS["ink"],
+                "fontFamily": FONT_FAMILY}),
+            html.P(subtitle, style={
+                "marginTop": "0", "marginBottom": "24px",
+                "color": COLORS["gray"], "fontSize": "13px",
+                "fontFamily": FONT_FAMILY, "lineHeight": "1.5"}),
+            *children,
+        ],
+    )
+
+
+def _chart_card(children, margin_bottom="20px"):
+    """White card wrapper for a chart."""
+    return html.Div(
+        style={
+            "backgroundColor": "#fff",
+            "borderRadius": "8px",
+            "border": f"1px solid {COLORS['border']}",
+            "padding": "16px",
+            "marginBottom": margin_bottom,
+            "overflow": "hidden",
+        },
+        children=children,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Layout
+# ---------------------------------------------------------------------------
+
 def layout():
     """Return the page layout."""
-    return html.Div([
-        # Synthetic Data Disclaimer Banner
-        html.Div([
-            html.Div([
-                html.Span("⚠️ ", style={"fontSize": "18px", "marginRight": "8px"}),
-                html.Span("Development Mode: ",
-                           style={"fontWeight": "600", "marginRight": "4px"}),
-                html.Span(
-                    "Partner group associations and all comparison data are mocked "
-                    "for development purposes. This will be replaced with real data "
-                    "in production."),
-            ], style={
-                "display": "flex", "alignItems": "flex-start", "lineHeight": "1.5",
-                "padding": "14px 16px", "backgroundColor": "#fef3c7",
-                "borderLeft": "4px solid #f59e0b", "borderRadius": "4px",
-                "color": "#78350f", "fontSize": "13px", "fontFamily": FONT_FAMILY,
-            }),
-        ], style={"marginBottom": "28px"}),
+    return html.Div(
+        style={"padding": "20px", "fontFamily": FONT_FAMILY,
+               "maxWidth": "1200px", "margin": "0 auto"},
+        children=[
+            # Synthetic Data Disclaimer Banner
+            html.Div(
+                style={
+                    "display": "flex", "alignItems": "flex-start",
+                    "lineHeight": "1.5",
+                    "padding": "14px 16px", "backgroundColor": "#fef3c7",
+                    "borderLeft": "4px solid #f59e0b", "borderRadius": "4px",
+                    "color": "#78350f", "fontSize": "13px",
+                    "fontFamily": FONT_FAMILY, "marginBottom": "28px",
+                },
+                children=[
+                    html.Span("⚠️ ", style={"fontSize": "18px", "marginRight": "8px"}),
+                    html.Span("Development Mode: ",
+                              style={"fontWeight": "600", "marginRight": "4px"}),
+                    html.Span(
+                        "Partner group associations and all comparison data are "
+                        "mocked for development purposes."),
+                ],
+            ),
 
-        # Section 1: Intra-Firm Team Comparison
-        html.Div([
-            html.H2("Team Comparison", style={
-                "marginTop": "0", "marginBottom": "12px", "fontSize": "24px",
-                "fontWeight": "600", "color": COLORS["ink"], "fontFamily": FONT_FAMILY}),
-            html.P(
-                "Select a partner group to view side-by-side performance profiles "
-                "of all advisors.",
-                style={"marginTop": "0", "marginBottom": "20px",
-                       "color": COLORS["gray"], "fontSize": "14px",
-                       "fontFamily": FONT_FAMILY}),
+            # ===== Section 1: Intra-Firm Team Comparison =====
+            _section_card(
+                "Team Comparison",
+                "Select a partner group to view side-by-side performance "
+                "profiles of all advisors within a firm.",
+                COLORS["soft_blue"],
+                [
+                    # Controls Row
+                    html.Div(
+                        style={"display": "flex", "gap": "16px",
+                               "marginBottom": "20px", "flexWrap": "wrap"},
+                        children=[
+                            html.Div(
+                                style={"flex": "2", "minWidth": "250px"},
+                                children=[
+                                    html.Label("Firm / Partner Group:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.Dropdown(
+                                        id="team-partner-group-dropdown",
+                                        placeholder="Choose a firm...",
+                                        style={"fontSize": "13px"}),
+                                ],
+                            ),
+                            html.Div(
+                                style={"flex": "1", "minWidth": "180px"},
+                                children=[
+                                    html.Label("Calculation Method:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.Dropdown(
+                                        id="team-method-dropdown",
+                                        options=[
+                                            {"label": "Mean", "value": "mean"},
+                                            {"label": "Penalized", "value": "penalized"},
+                                            {"label": "Weighted", "value": "weighted"},
+                                        ],
+                                        value="mean",
+                                        style={"fontSize": "13px"}),
+                                ],
+                            ),
+                        ],
+                    ),
 
-            # Controls Row
-            html.Div([
-                html.Div([
-                    html.Label("Select Firm / Partner Group:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.Dropdown(
-                        id="team-partner-group-dropdown",
-                        placeholder="Choose a firm...",
-                        style={"fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ], style={"flex": "1", "minWidth": "250px"}),
-                html.Div([
-                    html.Label("Calculation Method:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.Dropdown(
-                        id="team-method-dropdown",
-                        options=[{"label": "Mean", "value": "mean"},
-                                 {"label": "Penalized", "value": "penalized"},
-                                 {"label": "Weighted", "value": "weighted"}],
-                        value="mean",
-                        style={"fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ], style={"flex": "1", "minWidth": "200px"}),
-            ], style={"display": "flex", "marginBottom": "24px",
-                      "gap": "20px", "flexWrap": "wrap"}),
+                    # Team Spider Chart
+                    _chart_card([
+                        dcc.Graph(
+                            id="team-spider-chart",
+                            figure=_empty_fig("Select a partner group above", 400),
+                            config={"responsive": True, "displayModeBar": False},
+                            style={"height": "400px"},
+                        ),
+                    ]),
 
-            # Team Spider Chart
-            html.Div([
-                dcc.Loading(type="default", children=[
-                    dcc.Graph(id="team-spider-chart",
-                              config={"responsive": True, "displayModeBar": True}),
-                ]),
-            ], style={
-                "marginBottom": "24px", "padding": "16px", "backgroundColor": "#fff",
-                "borderRadius": "6px", "border": f"1px solid {COLORS['border']}"}),
+                    # Team Bar Chart
+                    _chart_card([
+                        dcc.Graph(
+                            id="team-bar-chart",
+                            figure=_empty_fig("Select a partner group above", 350),
+                            config={"responsive": True, "displayModeBar": False},
+                            style={"height": "350px"},
+                        ),
+                    ], margin_bottom="0"),
+                ],
+            ),
 
-            # Team Bar Chart
-            html.Div([
-                dcc.Loading(type="default", children=[
-                    dcc.Graph(id="team-bar-chart",
-                              config={"responsive": True, "displayModeBar": True}),
-                ]),
-            ], style={
-                "padding": "16px", "backgroundColor": "#fff",
-                "borderRadius": "6px", "border": f"1px solid {COLORS['border']}"}),
-        ], style={
-            "marginBottom": "48px", "padding": "24px",
-            "backgroundColor": COLORS["soft_blue"], "borderRadius": "8px"}),
-
-        # Section 2: Entity-to-Entity Comparison
-        html.Div([
-            html.H2("Head-to-Head Comparison", style={
-                "marginTop": "0", "marginBottom": "12px", "fontSize": "24px",
-                "fontWeight": "600", "color": COLORS["ink"], "fontFamily": FONT_FAMILY}),
-            html.P(
+            # ===== Section 2: Entity-to-Entity Comparison =====
+            _section_card(
+                "Head-to-Head Comparison",
                 "Select two entities to compare their performance profiles "
-                "across all dimensions.",
-                style={"marginTop": "0", "marginBottom": "20px",
-                       "color": COLORS["gray"], "fontSize": "14px",
-                       "fontFamily": FONT_FAMILY}),
+                "across all six Advisor DNA dimensions.",
+                COLORS.get("soft_lavender", "#f3f0ff"),
+                [
+                    # Controls Row
+                    html.Div(
+                        style={"display": "flex", "gap": "24px",
+                               "marginBottom": "20px", "flexWrap": "wrap",
+                               "alignItems": "flex-end"},
+                        children=[
+                            html.Div(
+                                style={"minWidth": "200px"},
+                                children=[
+                                    html.Label("Entity Type:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.RadioItems(
+                                        id="entity-type-radio",
+                                        options=[
+                                            {"label": " Firm", "value": "firm"},
+                                            {"label": " Advisor", "value": "advisor"},
+                                            {"label": " Both", "value": "both"},
+                                        ],
+                                        value="both", inline=True,
+                                        style={"display": "flex", "gap": "14px"},
+                                        labelStyle={
+                                            "display": "inline-flex",
+                                            "alignItems": "center",
+                                            "fontSize": "13px",
+                                        }),
+                                ],
+                            ),
+                            html.Div(
+                                style={"minWidth": "180px"},
+                                children=[
+                                    html.Label("Calculation Method:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.Dropdown(
+                                        id="entity-method-dropdown",
+                                        options=[
+                                            {"label": "Mean", "value": "mean"},
+                                            {"label": "Penalized", "value": "penalized"},
+                                            {"label": "Weighted", "value": "weighted"},
+                                        ],
+                                        value="mean",
+                                        style={"fontSize": "13px"}),
+                                ],
+                            ),
+                        ],
+                    ),
 
-            # Controls Row
-            html.Div([
-                html.Div([
-                    html.Label("Entity Type:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.RadioItems(
-                        id="entity-type-radio",
-                        options=[{"label": " Firm", "value": "firm"},
-                                 {"label": " Advisor", "value": "advisor"},
-                                 {"label": " Both", "value": "both"}],
-                        value="both", inline=True,
-                        style={"display": "flex", "gap": "16px"},
-                        labelStyle={"display": "inline-flex", "alignItems": "center",
-                                    "fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ]),
-                html.Div([
-                    html.Label("Calculation Method:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.Dropdown(
-                        id="entity-method-dropdown",
-                        options=[{"label": "Mean", "value": "mean"},
-                                 {"label": "Penalized", "value": "penalized"},
-                                 {"label": "Weighted", "value": "weighted"}],
-                        value="mean",
-                        style={"fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ], style={"minWidth": "200px"}),
-            ], style={"display": "flex", "gap": "40px", "marginBottom": "24px",
-                      "flexWrap": "wrap"}),
+                    # Entity Dropdowns Row
+                    html.Div(
+                        style={"display": "grid",
+                               "gridTemplateColumns": "1fr 1fr",
+                               "gap": "16px", "marginBottom": "20px"},
+                        children=[
+                            html.Div([
+                                html.Label("Entity A:", style={
+                                    "fontWeight": "600", "marginBottom": "6px",
+                                    "display": "block",
+                                    "color": COLORS["blue"], "fontSize": "12px"}),
+                                dcc.Dropdown(
+                                    id="entity-a-dropdown",
+                                    placeholder="Select Entity A...",
+                                    style={"fontSize": "13px"}),
+                            ]),
+                            html.Div([
+                                html.Label("Entity B:", style={
+                                    "fontWeight": "600", "marginBottom": "6px",
+                                    "display": "block",
+                                    "color": "#D4376E", "fontSize": "12px"}),
+                                dcc.Dropdown(
+                                    id="entity-b-dropdown",
+                                    placeholder="Select Entity B...",
+                                    style={"fontSize": "13px"}),
+                            ]),
+                        ],
+                    ),
 
-            # Entity Dropdowns Row
-            html.Div([
-                html.Div([
-                    html.Label("Entity A:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.Dropdown(
-                        id="entity-a-dropdown", placeholder="Select Entity A...",
-                        style={"fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ], style={"flex": "1", "minWidth": "250px"}),
-                html.Div([
-                    html.Label("Entity B:", style={
-                        "fontWeight": "500", "marginBottom": "8px",
-                        "color": COLORS["ink"], "fontSize": "13px",
-                        "fontFamily": FONT_FAMILY}),
-                    dcc.Dropdown(
-                        id="entity-b-dropdown", placeholder="Select Entity B...",
-                        style={"fontFamily": FONT_FAMILY, "fontSize": "13px"}),
-                ], style={"flex": "1", "minWidth": "250px"}),
-            ], style={"display": "flex", "marginBottom": "24px",
-                      "gap": "20px", "flexWrap": "wrap"}),
+                    # Entity Spider Chart
+                    _chart_card([
+                        dcc.Graph(
+                            id="entity-spider-chart",
+                            figure=_empty_fig("Select two entities above", 420),
+                            config={"responsive": True, "displayModeBar": False},
+                            style={"height": "420px"},
+                        ),
+                    ]),
 
-            # Entity Spider Chart
-            html.Div([
-                dcc.Loading(type="default", children=[
-                    dcc.Graph(id="entity-spider-chart",
-                              config={"responsive": True, "displayModeBar": True}),
-                ]),
-            ], style={
-                "marginBottom": "24px", "padding": "16px", "backgroundColor": "#fff",
-                "borderRadius": "6px", "border": f"1px solid {COLORS['border']}"}),
-
-            # Comparison Table
-            html.Div([
-                html.Div(id="entity-comparison-table"),
-            ], style={
-                "padding": "16px", "backgroundColor": "#fff",
-                "borderRadius": "6px", "border": f"1px solid {COLORS['border']}"}),
-        ], style={
-            "padding": "24px", "backgroundColor": COLORS["soft_lavender"],
-            "borderRadius": "8px"}),
-    ], style={"padding": "20px", "fontFamily": FONT_FAMILY})
+                    # Comparison Table
+                    _chart_card([
+                        html.Div(id="entity-comparison-table"),
+                    ], margin_bottom="0"),
+                ],
+            ),
+        ],
+    )
 
 
 # =============================================================================
@@ -247,7 +322,6 @@ def populate_partner_groups(_):
     groups = get_partner_groups()
     if not groups:
         return [], None
-    # API returns: [{"partner_group_code": ..., "partner_group_name": ..., "member_count": ...}]
     options = [
         {"label": f"{g['partner_group_name']} ({g.get('member_count', '?')} members)",
          "value": g["partner_group_code"]}
@@ -265,15 +339,17 @@ def populate_partner_groups(_):
 def update_team_charts(group_code, method):
     """Update team comparison charts."""
     if not group_code:
-        return _empty_fig("Select a partner group"), _empty_fig("Select a partner group")
+        return _empty_fig("Select a partner group", 400), \
+               _empty_fig("Select a partner group", 350)
 
-    # API returns {"group_code", "group_name", "members": [profile_dicts]}
     data = get_partner_group_members(group_code, method=method)
     if not data or not data.get("members"):
-        return _empty_fig("No data for this group"), _empty_fig("No data for this group")
+        return _empty_fig("No data for this group", 400), \
+               _empty_fig("No data for this group", 350)
 
     members = data["members"]
     colors = DATA_VIZ_PALETTE[:len(members)]
+    group_name = data.get("group_name", group_code)
 
     # Spider chart
     spider_fig = go.Figure()
@@ -287,22 +363,27 @@ def update_team_charts(group_code, method):
             r=values,
             theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
             fill="toself", name=name,
-            line={"color": colors[idx]},
-            fillcolor=colors[idx], opacity=0.6,
+            line={"color": colors[idx], "width": 2},
+            fillcolor=colors[idx], opacity=0.5,
         ))
 
     spider_fig.update_layout(
         polar=dict(
             radialaxis=dict(visible=True,
-                            tickfont={"size": 11, "family": FONT_FAMILY}),
-            angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY})),
+                            tickfont={"size": 10, "family": FONT_FAMILY},
+                            gridcolor=COLORS["border"]),
+            angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY}),
+            bgcolor="rgba(255,255,255,0.5)",
+        ),
         font={"family": FONT_FAMILY, "size": 12},
         hovermode="closest", showlegend=True,
-        legend={"x": 1.1, "y": 1, "font": {"size": 11}},
-        title={"text": f"{data.get('group_name', group_code)} — Performance Profiles",
+        legend={"orientation": "h", "y": -0.15, "x": 0.5, "xanchor": "center",
+                "font": {"size": 11}},
+        title={"text": f"{group_name} — Performance Profiles",
                "x": 0.5, "xanchor": "center",
-               "font": {"size": 16, "color": COLORS["ink"]}},
-        margin={"l": 80, "r": 200, "t": 100, "b": 80},
+               "font": {"size": 15, "color": COLORS["ink"]}},
+        margin={"l": 60, "r": 60, "t": 60, "b": 80},
+        height=400,
         paper_bgcolor="white",
     )
 
@@ -315,20 +396,23 @@ def update_team_charts(group_code, method):
         bar_fig.add_trace(go.Bar(
             name=name,
             x=[DIM_SHORT[d] for d in DIMENSIONS],
-            y=values, marker={"color": colors[idx]}, opacity=0.8,
+            y=values, marker={"color": colors[idx]}, opacity=0.85,
         ))
 
     bar_fig.update_layout(
         barmode="group",
         title={"text": "Team Scores by Dimension", "x": 0.5, "xanchor": "center",
-               "font": {"size": 16, "color": COLORS["ink"]}},
-        xaxis={"title": "Dimension", "tickfont": {"size": 11}, "title_font": {"size": 12}},
-        yaxis={"title": "Score", "tickfont": {"size": 11}, "title_font": {"size": 12}},
+               "font": {"size": 15, "color": COLORS["ink"]}},
+        xaxis={"title": "", "tickfont": {"size": 11}},
+        yaxis={"title": "Score", "tickfont": {"size": 11}, "title_font": {"size": 12},
+               "gridcolor": COLORS["border"]},
         font={"family": FONT_FAMILY, "size": 12},
         hovermode="x unified",
-        legend={"x": 1.02, "y": 1, "font": {"size": 11}},
-        margin={"l": 60, "r": 150, "t": 100, "b": 80},
-        paper_bgcolor="white",
+        legend={"orientation": "h", "y": -0.18, "x": 0.5, "xanchor": "center",
+                "font": {"size": 11}},
+        margin={"l": 50, "r": 20, "t": 60, "b": 70},
+        height=350,
+        paper_bgcolor="white", plot_bgcolor="white",
     )
 
     return spider_fig, bar_fig
@@ -341,7 +425,6 @@ def update_team_charts(group_code, method):
 )
 def update_entity_dropdowns(entity_type):
     """Update entity dropdown options based on type filter."""
-    # get_dna_entities() returns {"firms": [...], "advisors": [...]}
     entities = get_dna_entities()
     if not entities:
         return [], []
@@ -373,12 +456,11 @@ def update_entity_dropdowns(entity_type):
 def update_entity_comparison(entity_a_id, entity_b_id, method):
     """Update entity comparison chart and table."""
     if not entity_a_id or not entity_b_id:
-        return _empty_fig("Select two entities to compare."), html.Div()
+        return _empty_fig("Select two entities to compare.", 420), html.Div()
 
-    # API returns list of score dicts for each entity
     results = get_entity_comparison([entity_a_id, entity_b_id], method=method)
     if not results or len(results) < 2:
-        return _empty_fig("No comparison data available."), html.Div()
+        return _empty_fig("No comparison data available.", 420), html.Div()
 
     entity_a = results[0]
     entity_b = results[1]
@@ -399,21 +481,26 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
             r=values,
             theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
             fill="toself", name=name,
-            line={"color": color}, fillcolor=color, opacity=0.5,
+            line={"color": color, "width": 2}, fillcolor=color, opacity=0.4,
         ))
 
     spider_fig.update_layout(
         polar=dict(
             radialaxis=dict(visible=True,
-                            tickfont={"size": 11, "family": FONT_FAMILY}),
-            angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY})),
+                            tickfont={"size": 10, "family": FONT_FAMILY},
+                            gridcolor=COLORS["border"]),
+            angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY}),
+            bgcolor="rgba(255,255,255,0.5)",
+        ),
         font={"family": FONT_FAMILY, "size": 12},
         hovermode="closest", showlegend=True,
-        legend={"x": 1.1, "y": 1, "font": {"size": 11}},
-        title={"text": "Head-to-Head Performance Comparison",
+        legend={"orientation": "h", "y": -0.15, "x": 0.5, "xanchor": "center",
+                "font": {"size": 11}},
+        title={"text": f"{a_name} vs {b_name}",
                "x": 0.5, "xanchor": "center",
-               "font": {"size": 16, "color": COLORS["ink"]}},
-        margin={"l": 80, "r": 200, "t": 100, "b": 80},
+               "font": {"size": 15, "color": COLORS["ink"]}},
+        margin={"l": 60, "r": 60, "t": 60, "b": 80},
+        height=420,
         paper_bgcolor="white",
     )
 
@@ -432,39 +519,42 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
 
         table_rows.append(html.Tr([
             html.Td(DIM_LABELS[dim], style={
-                "padding": "12px",
+                "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
                 "fontWeight": "500", "color": COLORS["ink"]}),
             html.Td(f"{a_val:.3f}", style={
-                "padding": "12px",
+                "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "textAlign": "center", "color": COLORS["blue"], "fontWeight": "500"}),
+                "textAlign": "center", "color": COLORS["blue"],
+                "fontWeight": "600"}),
             html.Td(f"{b_val:.3f}", style={
-                "padding": "12px",
+                "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "textAlign": "center", "color": "#D4376E", "fontWeight": "500"}),
+                "textAlign": "center", "color": "#D4376E",
+                "fontWeight": "600"}),
             html.Td(diff_text, style={
-                "padding": "12px",
+                "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "textAlign": "center", "color": diff_color, "fontWeight": "500"}),
+                "textAlign": "center", "color": diff_color,
+                "fontWeight": "600"}),
         ]))
 
     table = html.Table([
         html.Thead(html.Tr([
             html.Th("Dimension", style={
-                "padding": "12px", "textAlign": "left", "fontWeight": "600",
+                "padding": "10px 12px", "textAlign": "left", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": COLORS["ink"],
                 "borderBottom": f"2px solid {COLORS['border']}"}),
             html.Th(a_name, style={
-                "padding": "12px", "textAlign": "center", "fontWeight": "600",
+                "padding": "10px 12px", "textAlign": "center", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": COLORS["blue"],
                 "borderBottom": f"2px solid {COLORS['border']}"}),
             html.Th(b_name, style={
-                "padding": "12px", "textAlign": "center", "fontWeight": "600",
+                "padding": "10px 12px", "textAlign": "center", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": "#D4376E",
                 "borderBottom": f"2px solid {COLORS['border']}"}),
             html.Th("Difference (B − A)", style={
-                "padding": "12px", "textAlign": "center", "fontWeight": "600",
+                "padding": "10px 12px", "textAlign": "center", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": COLORS["ink"],
                 "borderBottom": f"2px solid {COLORS['border']}"}),
         ])),

@@ -2,6 +2,7 @@
 
 Features:
 - Top-N entities per dimension with horizontal bar charts
+- Composite (average across all dimensions) leaderboard
 - Filterable by entity type, pool, and scoring method
 - Click to expand inline detail card with full 6-dimension profile
 """
@@ -57,10 +58,18 @@ def _create_bar_chart(data, dimension, method):
     entity_ids = [item["advisor_id"] for item in sorted_data]
     customdata = [[eid] for eid in entity_ids]
 
+    # Pick color: composite gets navy, individual dims get their palette color
+    if dimension == "composite":
+        bar_color = COLORS["navy"]
+        title_text = f"Composite Score — {method.title()}"
+    else:
+        bar_color = DIM_COLORS.get(dimension, COLORS["blue"])
+        title_text = f"{DIM_LABELS.get(dimension, dimension)} — {method.title()}"
+
     fig = go.Figure()
     fig.add_trace(go.Bar(
         y=names, x=scores, orientation="h",
-        marker=dict(color=DIM_COLORS.get(dimension, COLORS["blue"]),
+        marker=dict(color=bar_color,
                     line=dict(color=COLORS["navy"], width=1)),
         text=[f"{s:.3f}" for s in scores],
         textposition="outside",
@@ -70,7 +79,7 @@ def _create_bar_chart(data, dimension, method):
     ))
 
     fig.update_layout(
-        title={"text": f"{DIM_LABELS.get(dimension, dimension)} — {method.title()}",
+        title={"text": title_text,
                "x": 0.5, "xanchor": "center",
                "font": dict(size=16, color=COLORS["ink"], family=FONT_FAMILY)},
         xaxis=dict(title="Score",
@@ -122,6 +131,9 @@ def _create_spider_chart(profile_scores, entity_name):
 # ---------------------------------------------------------------------------
 
 def layout():
+    dim_options = [{"label": "⭐ Composite (All Dimensions)", "value": "composite"}] + \
+                  [{"label": DIM_LABELS[d], "value": d} for d in DIMENSIONS]
+
     return html.Div([
         html.Div([
             html.H2("Leaderboard", style={
@@ -141,8 +153,8 @@ def layout():
                     "color": COLORS["gray"], "marginBottom": "4px"}),
                 dcc.Dropdown(
                     id="lb-dimension-dropdown",
-                    options=[{"label": DIM_LABELS[d], "value": d} for d in DIMENSIONS],
-                    value=DIMENSIONS[0], clearable=False, style={"fontSize": "12px"}),
+                    options=dim_options,
+                    value="composite", clearable=False, style={"fontSize": "12px"}),
             ], style={"flex": "2", "minWidth": "250px"}),
             html.Div([
                 html.Label("Method:", style={
@@ -186,7 +198,7 @@ def layout():
                 "color": COLORS["gray"], "marginRight": "12px"}),
             html.Div([
                 dcc.Slider(
-                    id="lb-top-n-slider", min=5, max=25, step=1, value=10,
+                    id="lb-top-n-slider", min=5, max=25, step=1, value=5,
                     marks={5: "5", 10: "10", 15: "15", 20: "20", 25: "25"},
                     tooltip={"placement": "bottom", "always_visible": True}),
             ], style={"flex": "1", "minWidth": "300px", "marginLeft": "16px"}),
@@ -225,15 +237,49 @@ def update_leaderboard_chart(dimension, method, entity_type, pool, top_n):
     """Fetch leaderboard data and render the bar chart."""
     min_peer_reviews = 20 if pool == "premier" else 0
 
-    # API returns {dim_key: [entries]} for ALL dimensions
+    # Request a generous top_n for composite calculation — we need entries
+    # from ALL dimensions to compute averages, then trim to the requested N.
+    request_n = max(top_n, 25) if dimension == "composite" else top_n
+
     data = get_leaderboard(
         method=method, entity_type=entity_type,
-        min_peer_reviews=min_peer_reviews, top_n=top_n,
+        min_peer_reviews=min_peer_reviews, top_n=request_n,
     )
 
-    # Pick the entries for the selected dimension
-    dim_entries = data.get(dimension, []) if data else []
-    fig = _create_bar_chart(dim_entries, dimension, method)
+    if dimension == "composite":
+        # Compute composite: average across all 6 dimensions per entity
+        entity_totals = {}   # advisor_id -> {"name": str, "sum": float, "count": int}
+        for dim in DIMENSIONS:
+            for entry in (data.get(dim, []) if data else []):
+                eid = entry.get("advisor_id", "")
+                if not eid:
+                    continue
+                if eid not in entity_totals:
+                    entity_totals[eid] = {
+                        "advisor_name": entry.get("advisor_name", "Unknown"),
+                        "sum": 0.0, "count": 0,
+                    }
+                entity_totals[eid]["sum"] += entry.get("score", 0)
+                entity_totals[eid]["count"] += 1
+
+        # Build composite entries — only include entities present in at least 3 dims
+        composite_entries = []
+        for eid, info in entity_totals.items():
+            if info["count"] >= 3:
+                composite_entries.append({
+                    "advisor_id": eid,
+                    "advisor_name": info["advisor_name"],
+                    "score": info["sum"] / info["count"],
+                })
+
+        # Sort and trim
+        composite_entries.sort(key=lambda x: x["score"], reverse=True)
+        composite_entries = composite_entries[:top_n]
+        fig = _create_bar_chart(composite_entries, "composite", method)
+    else:
+        dim_entries = data.get(dimension, []) if data else []
+        fig = _create_bar_chart(dim_entries, dimension, method)
+
     return fig
 
 
