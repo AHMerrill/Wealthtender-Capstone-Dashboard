@@ -255,9 +255,9 @@ app.layout = html.Div(
                                     min=10, max=50, step=5, value=20,
                                     marks={10: "10", 20: "20", 30: "30",
                                            40: "40", 50: "50"})),
-                                _filter("Exclude Stopwords", dcc.Checklist(
+                                _filter("N-Gram Stopwords", dcc.Checklist(
                                     id="eda-exclude-stopwords",
-                                    options=[{"label": "Exclude common words",
+                                    options=[{"label": "Exclude common words (N-Gram chart only)",
                                               "value": "exclude"}],
                                     value=["exclude"])),
 
