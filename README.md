@@ -3,7 +3,7 @@
 A two-service analytics dashboard built for the UT Austin MSBA 2026 Capstone with Wealthtender. Analyzes financial advisor client reviews using NLP-derived similarity scoring, interactive visualizations, and role-based access control.
 
 - **API** (`api/`) — FastAPI backend that serves normalized review data and advisor-dimension similarity scores from pre-built artifacts.
-- **Dashboard** (`dashboard/`) — Plotly Dash frontend with Advisor DNA analysis, EDA charts, benchmarks, and role-based access.
+- **Dashboard** (`dashboard/`) — Plotly Dash frontend with Advisor DNA analysis, EDA charts, benchmarks, leaderboard, comparisons, and role-based access.
 
 ---
 
@@ -31,25 +31,40 @@ A two-service analytics dashboard built for the UT Austin MSBA 2026 Capstone wit
 
 ### Advisor DNA
 
-Interactive analysis of advisor-dimension similarity scores derived from client reviews. Uses sentence-transformer embeddings to compute cosine similarity between each review and six quality dimensions (Trust & Integrity, Listening & Personalization, Communication Clarity, Responsiveness, Life Event Support, Investment Expertise).
+Interactive analysis of advisor-dimension similarity scores derived from client reviews. Uses sentence-transformer embeddings to compute cosine similarity between each review and six quality dimensions (Trust & Integrity, Customer Empathy & Personalization, Communication Clarity, Responsiveness, Life Event Support, Investment Expertise).
 
-- **Macro view** — 3D exploded pie chart showing dimension distribution across all reviews
-- **Firm / Advisor view** — Entity-specific pie chart with Dimension Profile bars, tier labels (Very Strong / Strong / Moderate / Foundational), and selectable scoring methods (Mean, Penalized, Weighted)
-- **Review drill-down** — Click a pie wedge to see associated reviews ranked by score, then click a review for full text alongside a spider/radar chart
+- **Macro view** — Horizontal bar chart showing dimension distribution across all reviews, with Bar/Spider toggle and Comparison Pool selector (All Advisors vs Premier 20+ Reviews)
+- **Firm / Advisor view** — Entity-specific bar chart with Dimension Profile bars, tier labels (Very Strong / Strong / Moderate / Foundational), spider/radar chart toggle, and premier pool comparison
+- **Confidence tiers** — Review count-based confidence system: <10 reviews shows amber "Directional Insights" banner, 20+ reviews earns green "Robust Data" badge and inclusion in the premier benchmarking pool
+- **Evidence cards** — Click any dimension to see the top-3 reviews driving that score, with rank badges, reviewer info, tier labels, and text snippets
+- **Review drill-down** — Click a pie wedge or evidence card to see full review text alongside a spider/radar chart of per-dimension scores
 - **Display modes** — Toggle between Raw Similarity and Percentile Rank views
-- **Method-specific tiering** — Tier breakpoints are computed per scoring method from entity-level distributions
+- **Scoring methods** — Mean, Penalized (consistency penalty), and Weighted (time-weighted) scoring with method-specific tier breakpoints
+- **Premier benchmarking** — "Compare against: All Advisors | Premier Advisors (20+ reviews)" toggle filters the percentile peer group to high-confidence entities only
 
 ### EDA (Exploratory Data Analysis)
 
-- Review volume over time, rating distributions, token counts, n-gram analysis
+- Review volume over time with Year/Quarter granularity toggle
+- Rating distributions, word counts, n-gram analysis
 - Searchable firm/advisor dropdown with "Return to Global" reset
 - Date range filter with "Use Max Range" button
-- Rating, token count, and review count filters
-- Stopword exclusion with custom stopword input
+- Rating, word count, and review count filters
+- Stopword exclusion (applied to n-gram charts only) with custom stopword input
+
+### Benchmarks *(Sprint 3 — In Progress)*
+
+Deep-dive into the premier benchmark pool: composition stats, dimension distributions at advisor and firm levels, P25/P50/P75 breakpoints, and peer percentile summary cards for selected entities.
+
+### Leaderboard *(Sprint 3 — In Progress)*
+
+Dimension leaderboard showing top-performing entities per dimension. Filterable by entity type (firm/advisor) and comparison pool (All/Premier). Click-to-expand detail cards.
+
+### Comparisons *(Sprint 3 — In Progress)*
+
+Intra-firm team comparison (side-by-side radar/bar of advisors within a firm) and entity-to-entity head-to-head comparison. Uses synthetic `partner_group` data for firm associations until Wealthtender provides the real export. Prominent disclaimer on synthetic data.
 
 ### Other Pages
 
-- **Benchmarks** — Industry benchmark comparisons
 - **Methodology** — Documentation of analytical methods
 - **Home (Splash)** — Role selection portal with admin password and firm access
 
@@ -211,9 +226,11 @@ dashboard/                    Plotly Dash frontend
     eda_content.py             EDA page charts and callback logic
   pages/
     splash.py                  Login / role selection page
-    advisor_dna.py             Advisor DNA page — pie charts, profile bars, drill-down
+    advisor_dna.py             Advisor DNA — bar/spider charts, evidence cards, drill-down
     eda.py                     EDA page registration
-    benchmarks.py              Benchmarks page
+    benchmarks.py              Benchmarks page — premier pool analytics
+    leaderboard.py             Leaderboard page — top entities per dimension
+    comparisons.py             Comparisons page — intra-firm and head-to-head
     methodology.py             Methodology page
   plots/
     eda_charts.py              EDA Plotly chart builders
@@ -254,15 +271,21 @@ Core analytical page for advisor-dimension similarity analysis.
 
 **Sidebar controls:**
 - Entity type toggle (Firm / Advisor)
-- Searchable entity dropdown
+- Searchable entity dropdown (shows review counts, filterable by premier status)
 - Scoring method selector (Mean / Penalized / Weighted) with info tooltip and expandable "Read more" panel
 - Display mode toggle (Raw Similarity / Percentile Rank)
+- Comparison pool toggle (All Advisors / Premier 20+ Reviews)
 - Reset to Macro View button
 
 **Views:**
-- **Macro** — 3D exploded pie of dimension totals across all 4,579 reviews, with clickable dimension description cards
-- **Entity** — 3D exploded pie for the selected firm/advisor, Dimension Profile horizontal bar chart with tier labels, clickable wedges to drill into reviews
+- **Macro** — Horizontal bar chart of dimension totals across all reviews, with Bar/Spider toggle and All/Premier pool selector (All: 4,579 reviews, Premier: 2,629 reviews)
+- **Entity** — Horizontal bar chart with tier labels and spider/radar chart toggle. Clickable dimension cards with evidence panels showing top-3 reviews driving each score
 - **Review** — Full review text with reviewer name, date, and spider chart showing per-dimension scores
+
+**Confidence system:**
+- **< 10 reviews:** Amber "Directional Insights" banner
+- **10–19 reviews:** Normal access, no banner
+- **20+ reviews:** Green "Robust Data" badge, included in premier pool
 
 **Scoring methods:**
 - **Mean** — Average cosine similarity across all reviews for the entity
@@ -282,13 +305,36 @@ Exploratory data analysis of the review corpus.
 - Entity type toggle (Firm / Advisor) with searchable dropdown
 - "Return to Global" button to reset to full dataset
 - Date range picker with "Use Max Range" reset button
-- Rating, token count, review count, and n-gram filters
-- Stopword controls
+- Time granularity selector (Year / Quarter)
+- Rating, word count, review count, and n-gram filters
+- Stopword controls (applied to n-gram chart only)
 
-**Charts:** Review volume over time, rating distribution, reviews per advisor, token count distribution, rating vs. token scatter, top n-grams.
+**Charts:** Review volume over time, rating distribution, reviews per advisor, word count distribution, rating vs. word count scatter, top n-grams.
 
-### Benchmarks (`/benchmarks`)
-Industry benchmark comparisons. Available to both admin and firm roles.
+### Benchmarks (`/benchmarks`) *(Sprint 3)*
+Premier pool analytics and peer benchmarking. Available to both admin and firm roles.
+
+**Planned content:**
+- Premier pool composition: advisor vs firm breakdown, review count distributions
+- Dimension score distributions at advisor and firm levels
+- P25/P50/P75 benchmark breakpoints per dimension
+- Peer percentile summary card for a selected entity (strengths & gaps at a glance)
+
+### Leaderboard (`/leaderboard`) *(Sprint 3)*
+Top-performing entities per dimension. Available to admin role.
+
+**Planned content:**
+- Top-N entities per dimension with score bars
+- Filterable by entity type (Firm / Advisor) and pool (All / Premier)
+- Click-to-expand detail cards showing full dimension profile
+
+### Comparisons (`/comparisons`) *(Sprint 3)*
+Intra-firm and head-to-head entity comparisons. Available to admin role.
+
+**Planned content:**
+- Intra-firm team comparison: side-by-side radar/bar of advisors within a firm
+- Entity-to-entity comparison: overlay two entities for head-to-head dimension comparison
+- Uses synthetic partner group data (with disclaimer) until Wealthtender provides real firm-advisor associations
 
 ### Methodology (`/methodology`)
 Documentation of analytical methods used in the dashboard. Admin-only.
@@ -318,11 +364,11 @@ All endpoints are prefixed with `/api/`. Authentication via `X-API-Key` header (
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/advisor-dna/macro` | Sampled review-dimension scores for macro view |
-| `GET /api/advisor-dna/macro-totals` | Dimension totals across all reviews |
+| `GET /api/advisor-dna/macro-totals` | Dimension totals across all reviews. Accepts `min_peer_reviews` for premier pool filtering |
 | `GET /api/advisor-dna/entities` | List of firms or advisors (`entity_type` param) |
 | `GET /api/advisor-dna/entity-reviews` | Reviews for a specific entity (`advisor_id` param) |
 | `GET /api/advisor-dna/advisor-scores` | Aggregated dimension scores (`advisor_id`, `method` params) |
-| `GET /api/advisor-dna/percentile-scores` | Percentile rank scores within peer group |
+| `GET /api/advisor-dna/percentile-scores` | Percentile rank scores within peer group. Accepts `min_peer_reviews` for premier pool |
 | `GET /api/advisor-dna/population-medians` | Population median scores by method |
 | `GET /api/advisor-dna/method-breakpoints` | Percentile breakpoints for tier labeling (`method`, `entity_type` params) |
 | `GET /api/advisor-dna/review/{review_idx}` | Single review detail by index |
@@ -484,7 +530,7 @@ When handing this project to Wealthtender's engineering team, here's a roadmap f
 | Package | Version | Role |
 |---------|---------|------|
 | `dash` | 2.16.1 | Frontend framework (Plotly Dash) |
-| `plotly` | 5.20.0 | Chart library (pie, bar, radar/spider charts) |
+| `plotly` | 5.20.0 | Chart library (bar, radar/spider, histogram charts) |
 | `fastapi` | 0.119.0 | Backend API framework |
 | `uvicorn` | 0.29.0 | ASGI server for FastAPI |
 | `pydantic` | 2.11.0 | Data validation for API models |
