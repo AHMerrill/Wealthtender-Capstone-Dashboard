@@ -517,7 +517,7 @@ def layout():
                                             {"label": "Bar", "value": "bar"},
                                             {"label": "Spider", "value": "spider"},
                                         ],
-                                        value="bar", inline=True,
+                                        value="spider", inline=True,
                                         labelStyle={"fontSize": "12px",
                                                     "marginRight": "12px"},
                                     ),
@@ -529,6 +529,7 @@ def layout():
                         id="dna-macro-chart",
                         figure=go.Figure(),
                         config={"displayModeBar": False},
+                        style={"display": "none"},
                     ),
                     dcc.Graph(
                         id="dna-macro-spider",
@@ -538,7 +539,6 @@ def layout():
                             "scrollZoom": False,
                             "doubleClick": False,
                         },
-                        style={"display": "none"},
                     ),
                     _desc_grid("macro"),
                     html.Div(
@@ -626,7 +626,7 @@ def layout():
                                             {"label": "Bar", "value": "bar"},
                                             {"label": "Spider", "value": "spider"},
                                         ],
-                                        value="bar", inline=True,
+                                        value="spider", inline=True,
                                         labelStyle={"fontSize": "12px",
                                                     "marginRight": "12px"},
                                     ),
@@ -649,6 +649,7 @@ def layout():
                         id="dna-entity-chart",
                         figure=go.Figure(),
                         config={"displayModeBar": False},
+                        style={"display": "none"},
                     ),
                     dcc.Graph(
                         id="dna-entity-spider",
@@ -658,7 +659,6 @@ def layout():
                             "scrollZoom": False,
                             "doubleClick": False,
                         },
-                        style={"display": "none"},
                     ),
                     _desc_grid("entity"),
                     # Attribute detail: definition + evidence + review list
@@ -838,7 +838,7 @@ def update_ref_card_and_mode(display_mode):
     prevent_initial_call=True,
 )
 def toggle_chart_type(chart_type):
-    chart_type = chart_type or "bar"
+    chart_type = chart_type or "spider"
     if chart_type == "spider":
         return {"display": "none"}, {"display": "block"}
     return {"display": "block"}, {"display": "none"}
@@ -851,7 +851,7 @@ def toggle_chart_type(chart_type):
     prevent_initial_call=True,
 )
 def toggle_macro_chart_type(chart_type):
-    chart_type = chart_type or "bar"
+    chart_type = chart_type or "spider"
     if chart_type == "spider":
         return {"display": "none"}, {"display": "block"}
     return {"display": "block"}, {"display": "none"}

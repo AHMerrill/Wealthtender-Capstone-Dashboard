@@ -125,8 +125,9 @@ SECTIONS = [
             ),
             html.H4("Embedding Model", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Review texts and query strings are encoded using a pre-trained sentence-transformer "
-                "model. The model maps variable-length text inputs to fixed-dimensional dense vectors "
+                "Review texts and query strings are encoded using the "
+                "all-MiniLM-L6-v2 model from the sentence-transformers library. "
+                "This model maps variable-length text inputs to 384-dimensional dense vectors "
                 "in a shared semantic space. This encoding is performed offline in a Jupyter notebook "
                 "and the resulting embeddings are stored as Parquet files for efficient reuse."
             ),
@@ -141,7 +142,9 @@ SECTIONS = [
             html.P(
                 "Six carefully crafted query strings define the quality dimensions. Each query is "
                 "a detailed paragraph (approximately 60-80 words) that describes the ideal client "
-                "experience for that dimension. These queries are designed to capture nuanced "
+                "experience for that dimension. These queries were developed through a combination "
+                "of subject matter expertise, analysis of real client reviews, and iterative "
+                "refinement with large language models (LLMs). They are designed to capture nuanced "
                 "aspects of advisor quality that go beyond simple keyword matching."
             ),
             html.P(
@@ -608,6 +611,30 @@ SECTIONS = [
                 "creates a virtual environment, installs dependencies, and starts both services "
                 "in a single terminal session. Docker Compose is available as an alternative for "
                 "developers who prefer containerized local environments."
+            ),
+            html.H4("WordPress Integration", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The two-service architecture is designed to integrate with existing web platforms "
+                "like WordPress. The simplest approach is an iframe embed — the dashboard runs on "
+                "its own domain and renders inside a WordPress page with no code changes. "
+                "Alternatively, the Dash frontend can be bypassed entirely: WordPress templates or "
+                "any other frontend can consume the FastAPI backend directly as a JSON API, giving "
+                "full control over presentation. A reverse proxy on a subdomain "
+                "(e.g., analytics.wealthtender.com) provides the most seamless experience."
+            ),
+            html.H4("Future: Live Data Pipeline", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The current system is snapshot-based — scoring artifacts are static files baked "
+                "into the API Docker image at build time. To update the data, the scoring notebook "
+                "is rerun, the CSVs are replaced, and the container is rebuilt."
+            ),
+            html.P(
+                "For a production system with continuously incoming reviews, the flat-file storage "
+                "can be swapped for a database (e.g., PostgreSQL). The only file that changes is "
+                "artifacts.py — CSV reads become database queries. The API endpoints, request "
+                "parameters, and JSON response shapes all stay identical, so the dashboard (or any "
+                "other frontend consuming the API) requires zero changes. The API is designed to be "
+                "storage-agnostic, making this a backend-only migration."
             ),
         ],
     },

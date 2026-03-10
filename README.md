@@ -362,7 +362,7 @@ The NOTICE file contains the required attribution text and the full list of cont
 
 ## 12. Deployment
 
-Both services are containerized and deploy to any Docker-compatible host. **The current Render deployment is temporary** — when migrating to Wealthtender infrastructure, follow the same steps on any platform (AWS ECS, GCP Cloud Run, Railway, Fly.io, a WordPress-adjacent VPS, etc.).
+Both services are containerized and deploy to any Docker-compatible host, including alongside an existing WordPress installation. **The current Render deployment is temporary** — when migrating to Wealthtender infrastructure, follow the same steps on any platform (AWS ECS, GCP Cloud Run, Railway, Fly.io, a WordPress-adjacent VPS, etc.). See [Integration Notes (WordPress / Embedding)](#14-integration-notes-wordpress--embedding) for WordPress-specific deployment patterns.
 
 **Steps for any platform:**
 1. Deploy the API using `Dockerfile.api`
