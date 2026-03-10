@@ -292,7 +292,7 @@ All settings have sensible defaults for local development — zero configuration
 | `API_BASE` | `http://localhost:8000` | Dashboard | URL the dashboard uses to reach the API |
 | `PORT` | `8050` / `8000` | Both | Listening port (Render injects automatically) |
 | `API_KEY` | *(empty — auth off)* | Both | Shared secret between services |
-| `ADMIN_PASSWORD` | *(set in Render dashboard)* | Dashboard | Password for the admin portal |
+| `ADMIN_PASSWORD` | `WT$msba2026` | Dashboard | Password for the admin portal |
 
 See `.env.example` for the full list with comments.
 
