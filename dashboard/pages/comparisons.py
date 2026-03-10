@@ -140,6 +140,29 @@ def layout():
                                         style={"fontSize": "13px"}),
                                 ],
                             ),
+                            html.Div(
+                                style={"minWidth": "200px"},
+                                children=[
+                                    html.Label("Pool:", style={
+                                        "fontWeight": "600", "marginBottom": "6px",
+                                        "display": "block",
+                                        "color": COLORS["ink"], "fontSize": "12px"}),
+                                    dcc.RadioItems(
+                                        id="entity-pool-radio",
+                                        options=[
+                                            {"label": " All", "value": "all"},
+                                            {"label": " Premier (20+ reviews)",
+                                             "value": "premier"},
+                                        ],
+                                        value="all", inline=True,
+                                        style={"display": "flex", "gap": "14px"},
+                                        labelStyle={
+                                            "display": "inline-flex",
+                                            "alignItems": "center",
+                                            "fontSize": "13px",
+                                        }),
+                                ],
+                            ),
                         ],
                     ),
 
@@ -403,29 +426,47 @@ def update_team_charts(group_code, method):
 @callback(
     Output("entity-a-dropdown", "options"),
     Output("entity-b-dropdown", "options"),
+    Output("entity-a-dropdown", "value"),
+    Output("entity-b-dropdown", "value"),
     Input("entity-type-radio", "value"),
+    Input("entity-pool-radio", "value"),
+    State("entity-a-dropdown", "value"),
+    State("entity-b-dropdown", "value"),
 )
-def update_entity_dropdowns(entity_type):
-    """Update entity dropdown options based on type filter."""
+def update_entity_dropdowns(entity_type, pool, current_a, current_b):
+    """Update entity dropdown options based on type and pool filter."""
     entities = get_dna_entities()
     if not entities:
-        return [], []
+        return [], [], None, None
+
+    min_reviews = 20 if pool == "premier" else 0
 
     options = []
     if entity_type in ("both", "firm"):
         for f in entities.get("firms", []):
+            rc = f.get("review_count") or 0
+            if rc < min_reviews:
+                continue
             options.append({
                 "label": f"{f.get('advisor_name', 'Unknown')} (Firm)",
                 "value": f.get("advisor_id", "")
             })
     if entity_type in ("both", "advisor"):
         for a in entities.get("advisors", []):
+            rc = a.get("review_count") or 0
+            if rc < min_reviews:
+                continue
             options.append({
                 "label": f"{a.get('advisor_name', 'Unknown')} (Advisor)",
                 "value": a.get("advisor_id", "")
             })
 
-    return options, options
+    # Preserve current selections if they're still in the filtered options
+    valid_ids = {o["value"] for o in options}
+    new_a = current_a if current_a in valid_ids else None
+    new_b = current_b if current_b in valid_ids else None
+
+    return options, options, new_a, new_b
 
 
 def _extract_score(dim_data, key="raw"):

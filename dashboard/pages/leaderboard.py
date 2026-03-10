@@ -348,11 +348,13 @@ def layout():
         html.Div([
             dcc.Loading(type="default", children=[
                 dcc.Graph(id="lb-chart",
-                          config={"displayModeBar": True, "responsive": True}),
+                          config={"displayModeBar": True, "responsive": True},
+                          style={"minHeight": "300px"}),
             ]),
         ], style={
             "backgroundColor": "white", "padding": "20px", "borderRadius": "8px",
-            "border": f"1px solid {COLORS['border']}", "marginBottom": "24px"}),
+            "border": f"1px solid {COLORS['border']}", "marginBottom": "24px",
+            "position": "relative", "overflow": "hidden"}),
 
         # Comparison panel — holds spider + table for up to 2 clicked entities
         html.Div(id="lb-compare-panel", children=[
@@ -362,7 +364,8 @@ def layout():
         ], style={
             "backgroundColor": COLORS["soft_blue"], "borderRadius": "8px",
             "padding": "20px", "marginBottom": "20px",
-            "border": f"1px solid {COLORS['border']}"}),
+            "border": f"1px solid {COLORS['border']}",
+            "clear": "both", "position": "relative"}),
 
         # Hidden stores
         dcc.Store(id="lb-selected-ids", data=[]),
