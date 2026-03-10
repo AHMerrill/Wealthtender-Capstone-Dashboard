@@ -14,3 +14,5 @@ All notable changes to the Wealthtender Dashboard project.
 | 2026-03-09 | README | Updated to reflect Sprints 1-2 features and Sprint 3 plan. |
 | 2026-03-09 | FB-11–FB-18 | Sprint 3 completed: Benchmarks page (pool stats, histograms, percentile table), Leaderboard page (top-N bars, detail cards), Comparisons page (team spider/bar, head-to-head overlay). New API endpoints, mock partner groups, roles/nav updated. |
 | 2026-03-09 | Cleanup | Codebase cleanup: centralized shared dimension constants, removed unused imports/functions, removed legacy CSS. README rewritten for developer handoff. |
+| 2026-03-09 | Handoff Prep | Repo made public. Apache 2.0 license + NOTICE. Secrets audit. Download instructions. Re-hosting note. Non-project files removed from tracking. Data contract rewritten. |
+| 2026-03-09 | Code Review | Full code review tightening: advisor_dna.py now imports from constants.py (fixed color mapping mismatch), hardcoded fallback password removed from splash.py, empty DataFrame guard in artifacts.py, inline docs for thresholds, stale comments cleaned. |

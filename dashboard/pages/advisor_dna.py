@@ -2,7 +2,8 @@ import dash
 from dash import html, dcc, callback, Input, Output, State, no_update, ALL
 import plotly.graph_objects as go
 
-from dashboard.branding import COLORS, DATA_VIZ_PALETTE, FONT_FAMILY
+from dashboard.branding import COLORS, FONT_FAMILY
+from dashboard.constants import DIMENSIONS, DIM_LABELS, DIM_COLORS
 from dashboard.services.api import (
     get_dna_macro_totals,
     get_dna_entity_reviews,
@@ -12,33 +13,6 @@ from dashboard.services.api import (
 )
 
 dash.register_page(__name__, path="/advisor-dna", title="Advisor DNA")
-
-DIMENSIONS = [
-    "trust_integrity",
-    "listening_personalization",
-    "communication_clarity",
-    "responsiveness_availability",
-    "life_event_support",
-    "investment_expertise",
-]
-
-DIM_LABELS = {
-    "trust_integrity": "Trust & Integrity",
-    "listening_personalization": "Customer Empathy & Personalization",
-    "communication_clarity": "Communication Clarity",
-    "responsiveness_availability": "Responsiveness",
-    "life_event_support": "Life Event Support",
-    "investment_expertise": "Investment Expertise",
-}
-
-DIM_COLORS = {
-    "trust_integrity": DATA_VIZ_PALETTE[0],
-    "listening_personalization": DATA_VIZ_PALETTE[1],
-    "communication_clarity": DATA_VIZ_PALETTE[2],
-    "responsiveness_availability": DATA_VIZ_PALETTE[3],
-    "life_event_support": DATA_VIZ_PALETTE[5],
-    "investment_expertise": DATA_VIZ_PALETTE[6],
-}
 
 DIM_DESCRIPTIONS = {
     "trust_integrity": "Clients feel confident their advisor acts honestly and in their best interest.",

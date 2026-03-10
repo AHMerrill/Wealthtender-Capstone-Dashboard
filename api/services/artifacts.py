@@ -360,7 +360,7 @@ class ArtifactStore:
         extra.index = range(len(extra))
         scores = self.review_dim_scores
         for col in enrich_cols:
-            if col not in scores.columns and scores.index.max() < len(extra):
+            if col not in scores.columns and not scores.empty and scores.index.max() < len(extra):
                 scores[col] = scores["review_idx"].map(extra[col])
         self.review_dim_scores = scores
 
@@ -385,7 +385,12 @@ class ArtifactStore:
     _REVIEW_SIM_COLS = [f"sim_{d}" for d in _SIM_DIMS]
 
     def dna_macro_sample(self, n: int = 100, seed: int = 42) -> list:
-        """Return a sampled subset of reviews (for network graphs)."""
+        """Return a sampled subset of reviews (for macro-level network visualizations).
+
+        Args:
+            n: Maximum sample size (capped at available reviews).
+            seed: Random state for reproducible sampling.
+        """
         if self.review_dim_scores.empty:
             return []
         if self._dna_macro_cache is not None:
@@ -509,7 +514,7 @@ class ArtifactStore:
             "method": method,
             "peer_count": len(peers),
             "review_count": entity_review_count,
-            "premier": entity_review_count >= 20,
+            "premier": entity_review_count >= 20,  # Premier pool threshold (see data_contract)
             "scores": scores,
         }
 
@@ -1035,6 +1040,10 @@ class ArtifactStore:
 # --------------------------------------------------------------------------------------
 
 def _score_to_persona(score: float) -> str:
+    """Map a 0-100 composite score to a persona tier.
+
+    Thresholds: Headliner >= 80, Opener >= 65, Indie < 65.
+    """
     if score >= 80:
         return "Headliner"
     if score >= 65:

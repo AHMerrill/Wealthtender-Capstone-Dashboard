@@ -1,6 +1,7 @@
 """Shared constants for Advisor DNA dimensions.
 
-Used by advisor_dna.py, benchmarks.py, leaderboard.py, and comparisons.py.
+Single source of truth for all dashboard pages:
+advisor_dna.py, benchmarks.py, leaderboard.py, and comparisons.py.
 """
 
 from dashboard.branding import DATA_VIZ_PALETTE
@@ -32,4 +33,12 @@ DIM_SHORT = {
     "investment_expertise": "Expertise",
 }
 
-DIM_COLORS = {dim: DATA_VIZ_PALETTE[i] for i, dim in enumerate(DIMENSIONS)}
+# Indices intentionally skip palette[4] (deep navy, too close to palette[0]).
+DIM_COLORS = {
+    "trust_integrity": DATA_VIZ_PALETTE[0],
+    "listening_personalization": DATA_VIZ_PALETTE[1],
+    "communication_clarity": DATA_VIZ_PALETTE[2],
+    "responsiveness_availability": DATA_VIZ_PALETTE[3],
+    "life_event_support": DATA_VIZ_PALETTE[5],
+    "investment_expertise": DATA_VIZ_PALETTE[6],
+}

@@ -6,9 +6,9 @@ from dash import html, dcc, callback, Input, Output, State, no_update
 from dashboard.roles import ROLES
 from dashboard.services.api import get_firms
 
-# Admin password -- set via ADMIN_PASSWORD env var on Render.
-# Falls back to a default for local dev convenience.
-_ADMIN_PW = os.environ.get("ADMIN_PASSWORD", "WT$msba2026")
+# Admin password -- MUST be set via ADMIN_PASSWORD env var in production.
+# No fallback: force explicit configuration to avoid leaking a default in public repo.
+_ADMIN_PW = os.environ.get("ADMIN_PASSWORD", "")
 
 dash.register_page(__name__, path="/", title="Wealthtender Dashboard")
 

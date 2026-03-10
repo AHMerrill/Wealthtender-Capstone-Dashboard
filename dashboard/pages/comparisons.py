@@ -3,8 +3,6 @@
 Provides interactive visualizations for:
 1. Intra-Firm Team Comparison (FB-16): Side-by-side radar/bar charts of all advisors within a group
 2. Entity-to-Entity Comparison (FB-17): Overlaid spider charts comparing two entities
-
-Note: Partner group associations and data are mocked for development.
 """
 
 import dash
