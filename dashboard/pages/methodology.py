@@ -253,6 +253,25 @@ SECTIONS = [
                 "may differ from the threshold under mean scoring. The breakpoints are requested "
                 "from the API at render time and used consistently across all visualizations."
             ),
+            html.H4("Three Score Representations", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The API provides three representations for every dimension score, computed "
+                "server-side for consistency. Raw scores are the original cosine similarity "
+                "values (typically 0.15-0.60). Percentile ranks (0-100) show where an entity "
+                "falls relative to peers of the same type. Normalized scores rescale raw values "
+                "to 0-100 using min-max within the peer population. The Leaderboard and "
+                "Comparisons pages display percentile ranks for intuitive peer comparison, "
+                "while the Benchmarks page keeps raw scores so histograms reveal the true "
+                "distribution shape."
+            ),
+            html.H4("Composite Score", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The composite score is the arithmetic mean of an entity's scores across all "
+                "six dimensions. It is computed server-side and enriched with its own percentile "
+                "rank, normalized value, and tier label — just like individual dimensions. The "
+                "Leaderboard defaults to composite ranking, providing a single overall measure "
+                "of advisor performance."
+            ),
         ],
     },
     {

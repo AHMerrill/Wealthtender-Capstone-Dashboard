@@ -154,7 +154,7 @@ Exploratory data analysis of the review corpus: volume over time, rating distrib
 Premier pool deep-dive: composition KPIs (All vs Premier), dimension score distributions with histograms, and a peer percentile comparison table when an entity is selected. Defaults to Premier pool view.
 
 ### Leaderboard (`/leaderboard`)
-Top-N entities per dimension with horizontal bar charts. Includes a "Composite (All Dimensions)" option that averages across all six dimensions. Click up to 2 entities on the chart to compare their spider profiles and score tables side-by-side below.
+Top-N entities per dimension with horizontal bar charts showing **percentile rank** (ordinal labels like "92nd"). Includes a "Composite (All Dimensions)" option computed server-side. Click up to 2 entities to compare spider profiles and percentile tables below. Unselected bars fade to 30% opacity; raw scores shown on hover.
 
 ### Comparisons (`/comparisons`)
 Two sections:
@@ -189,7 +189,7 @@ All endpoints prefixed with `/api/`. Authentication via `X-API-Key` header (see 
 | `GET /api/advisor-dna/macro-totals` | Dimension totals across all reviews. `min_peer_reviews` param |
 | `GET /api/advisor-dna/entities` | List of firms and advisors |
 | `GET /api/advisor-dna/entity-reviews` | Reviews for a specific entity (`entity_id` param) |
-| `GET /api/advisor-dna/advisor-scores` | Aggregated dimension scores (`entity_id`, `method`) |
+| `GET /api/advisor-dna/advisor-scores` | Enriched dimension scores: raw + percentile + normalized + tier + composite (`entity_id`, `method`) |
 | `GET /api/advisor-dna/percentile-scores` | Percentile rank within peer group. `min_peer_reviews` param |
 | `GET /api/advisor-dna/method-breakpoints` | Percentile breakpoints for tier labeling (`method`, `entity_type`) |
 | `GET /api/advisor-dna/review/{review_idx}` | Single review detail by index |
@@ -199,10 +199,11 @@ All endpoints prefixed with `/api/`. Authentication via `X-API-Key` header (see 
 |----------|-------------|
 | `GET /api/benchmarks/pool-stats` | Pool composition stats (All vs Premier) |
 | `GET /api/benchmarks/distributions` | Dimension score distributions (`method`, `entity_type`, `min_peer_reviews`) |
-| `GET /api/leaderboard` | Top-N entities per dimension (`method`, `entity_type`, `min_peer_reviews`, `top_n`) |
+| `GET /api/leaderboard` | Enriched top-N per dimension (`method`, `entity_type`, `min_peer_reviews`, `top_n`, `dimension`). `dimension` can be `"all"` (default), a single dim key, or `"composite"`. Each entry includes `score`, `percentile`, `normalized`, `tier`. |
 | `GET /api/comparisons/partner-groups` | List of partner groups |
 | `GET /api/comparisons/partner-group/{group_code}` | Members of a partner group (`method`) |
-| `GET /api/comparisons/entities` | Compare entities (`entity_ids[]`, `method`) |
+| `GET /api/comparisons/entities` | Compare entities (`entity_ids[]`, `method`) — returns enriched profiles |
+| `GET /api/comparisons/head-to-head` | Full head-to-head comparison (`entity_a`, `entity_b`, `method`). Returns both enriched profiles + diffs for raw, percentile, and normalized per dimension. |
 
 ### Legacy Firm Endpoints
 These endpoints exist in the API but are not currently used by the dashboard frontend. They may be useful for external integrations:

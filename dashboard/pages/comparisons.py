@@ -324,12 +324,19 @@ def update_team_charts(group_code, method):
     colors = DATA_VIZ_PALETTE[:len(members)]
     group_name = data.get("group_name", group_code)
 
-    # Spider chart
+    def _get_dim_val(scores, dim, key="percentile"):
+        """Extract a value from enriched or legacy score dicts."""
+        v = scores.get(dim, {})
+        if isinstance(v, dict):
+            return v.get(key, 0) or 0
+        return v or 0
+
+    # Spider chart — percentile scale for consistency
     spider_fig = go.Figure()
     for idx, member in enumerate(members):
         name = member.get("advisor_name", "Unknown")
         scores = member.get("scores", {})
-        values = [scores.get(dim, 0) for dim in DIMENSIONS]
+        values = [_get_dim_val(scores, dim, "percentile") for dim in DIMENSIONS]
         values.append(values[0])  # close loop
 
         spider_fig.add_trace(go.Scatterpolar(
@@ -338,11 +345,12 @@ def update_team_charts(group_code, method):
             fill="toself", name=name,
             line={"color": colors[idx], "width": 2},
             fillcolor=colors[idx], opacity=0.5,
+            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
         ))
 
     spider_fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True,
+            radialaxis=dict(visible=True, range=[0, 100],
                             tickfont={"size": 10, "family": FONT_FAMILY},
                             gridcolor=COLORS["border"]),
             angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY}),
@@ -352,7 +360,7 @@ def update_team_charts(group_code, method):
         hovermode="closest", showlegend=True,
         legend={"orientation": "h", "y": -0.15, "x": 0.5, "xanchor": "center",
                 "font": {"size": 11}},
-        title={"text": f"{group_name} — Performance Profiles",
+        title={"text": f"{group_name} — Performance Profiles (Percentile)",
                "x": 0.5, "xanchor": "center",
                "font": {"size": 15, "color": COLORS["ink"]}},
         margin={"l": 60, "r": 60, "t": 60, "b": 80},
@@ -360,12 +368,12 @@ def update_team_charts(group_code, method):
         paper_bgcolor="white",
     )
 
-    # Bar chart
+    # Bar chart — percentile scale
     bar_fig = go.Figure()
     for idx, member in enumerate(members):
         name = member.get("advisor_name", "Unknown")
         scores = member.get("scores", {})
-        values = [scores.get(dim, 0) for dim in DIMENSIONS]
+        values = [_get_dim_val(scores, dim, "percentile") for dim in DIMENSIONS]
         bar_fig.add_trace(go.Bar(
             name=name,
             x=[DIM_SHORT[d] for d in DIMENSIONS],
@@ -374,10 +382,11 @@ def update_team_charts(group_code, method):
 
     bar_fig.update_layout(
         barmode="group",
-        title={"text": "Team Scores by Dimension", "x": 0.5, "xanchor": "center",
+        title={"text": "Team Percentile Ranks by Dimension", "x": 0.5, "xanchor": "center",
                "font": {"size": 15, "color": COLORS["ink"]}},
         xaxis={"title": "", "tickfont": {"size": 11}},
-        yaxis={"title": "Score", "tickfont": {"size": 11}, "title_font": {"size": 12},
+        yaxis={"title": "Percentile Rank", "tickfont": {"size": 11},
+               "title_font": {"size": 12}, "range": [0, 105],
                "gridcolor": COLORS["border"]},
         font={"family": FONT_FAMILY, "size": 12},
         hovermode="x unified",
@@ -426,8 +435,23 @@ def update_entity_dropdowns(entity_type):
     Input("entity-b-dropdown", "value"),
     Input("entity-method-dropdown", "value"),
 )
+def _extract_score(dim_data, key="raw"):
+    """Extract a score from enriched (dict) or legacy (float) format."""
+    if isinstance(dim_data, dict):
+        return dim_data.get(key, 0) or 0
+    return dim_data or 0
+
+
+def _ordinal(n):
+    """Return ordinal string (e.g. 92 -> '92nd')."""
+    n = int(round(n))
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
+
+
 def update_entity_comparison(entity_a_id, entity_b_id, method):
-    """Update entity comparison chart and table."""
+    """Update entity comparison chart and table with percentile display."""
     if not entity_a_id or not entity_b_id:
         return _empty_fig("Select two entities to compare.", 420), html.Div()
 
@@ -442,24 +466,25 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
     a_scores = entity_a.get("scores", {})
     b_scores = entity_b.get("scores", {})
 
-    # Spider chart
+    # Spider chart — uses percentile for consistent 0-100 scale
     spider_fig = go.Figure()
     for entity_data, name, color in [
         (a_scores, a_name, COLORS["blue"]),
         (b_scores, b_name, "#D4376E"),
     ]:
-        values = [entity_data.get(dim, 0) for dim in DIMENSIONS]
+        values = [_extract_score(entity_data.get(dim, {}), "percentile") for dim in DIMENSIONS]
         values.append(values[0])
         spider_fig.add_trace(go.Scatterpolar(
             r=values,
             theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
             fill="toself", name=name,
             line={"color": color, "width": 2}, fillcolor=color, opacity=0.4,
+            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
         ))
 
     spider_fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True,
+            radialaxis=dict(visible=True, range=[0, 100],
                             tickfont={"size": 10, "family": FONT_FAMILY},
                             gridcolor=COLORS["border"]),
             angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY}),
@@ -469,7 +494,7 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
         hovermode="closest", showlegend=True,
         legend={"orientation": "h", "y": -0.15, "x": 0.5, "xanchor": "center",
                 "font": {"size": 11}},
-        title={"text": f"{a_name} vs {b_name}",
+        title={"text": f"{a_name} vs {b_name} (Percentile Rank)",
                "x": 0.5, "xanchor": "center",
                "font": {"size": 15, "color": COLORS["ink"]}},
         margin={"l": 60, "r": 60, "t": 60, "b": 80},
@@ -477,37 +502,57 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
         paper_bgcolor="white",
     )
 
-    # Comparison table
+    # Comparison table — shows percentile (raw) per cell + composite row
+    all_dims = list(DIMENSIONS) + ["composite"]
+    dim_labels_ext = {**DIM_LABELS, "composite": "Composite"}
+
     table_rows = []
-    for dim in DIMENSIONS:
-        a_val = a_scores.get(dim, 0)
-        b_val = b_scores.get(dim, 0)
-        diff = b_val - a_val
-        if diff > 0:
-            diff_color, diff_text = "#10b981", f"+{diff:.3f}"
-        elif diff < 0:
-            diff_color, diff_text = "#ef4444", f"{diff:.3f}"
+    for dim in all_dims:
+        is_composite = dim == "composite"
+        a_data = a_scores.get(dim, {})
+        b_data = b_scores.get(dim, {})
+        a_pctile = _extract_score(a_data, "percentile")
+        b_pctile = _extract_score(b_data, "percentile")
+        a_raw = _extract_score(a_data, "raw")
+        b_raw = _extract_score(b_data, "raw")
+
+        pctile_diff = b_pctile - a_pctile
+        if pctile_diff > 0:
+            diff_color, diff_text = "#10b981", f"+{pctile_diff:.0f}"
+        elif pctile_diff < 0:
+            diff_color, diff_text = "#ef4444", f"{pctile_diff:.0f}"
         else:
-            diff_color, diff_text = COLORS["gray"], "0.000"
+            diff_color, diff_text = COLORS["gray"], "0"
+
+        border_top = f"2px solid {COLORS['border']}" if is_composite else "none"
 
         table_rows.append(html.Tr([
-            html.Td(DIM_LABELS[dim], style={
+            html.Td(dim_labels_ext.get(dim, dim), style={
                 "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "fontWeight": "500", "color": COLORS["ink"]}),
-            html.Td(f"{a_val:.3f}", style={
+                "borderTop": border_top,
+                "fontWeight": "700" if is_composite else "500",
+                "color": COLORS["ink"]}),
+            html.Td(html.Span([
+                html.Span(f"{_ordinal(a_pctile)} ", style={"fontWeight": "700"}),
+                html.Span(f"({a_raw:.3f})", style={"fontSize": "11px", "color": COLORS["gray"]}),
+            ]), style={
                 "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "textAlign": "center", "color": COLORS["blue"],
-                "fontWeight": "600"}),
-            html.Td(f"{b_val:.3f}", style={
+                "borderTop": border_top,
+                "textAlign": "center", "color": COLORS["blue"]}),
+            html.Td(html.Span([
+                html.Span(f"{_ordinal(b_pctile)} ", style={"fontWeight": "700"}),
+                html.Span(f"({b_raw:.3f})", style={"fontSize": "11px", "color": COLORS["gray"]}),
+            ]), style={
                 "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
-                "textAlign": "center", "color": "#D4376E",
-                "fontWeight": "600"}),
+                "borderTop": border_top,
+                "textAlign": "center", "color": "#D4376E"}),
             html.Td(diff_text, style={
                 "padding": "10px 12px",
                 "borderBottom": f"1px solid {COLORS['border']}",
+                "borderTop": border_top,
                 "textAlign": "center", "color": diff_color,
                 "fontWeight": "600"}),
         ]))
@@ -526,7 +571,7 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
                 "padding": "10px 12px", "textAlign": "center", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": "#D4376E",
                 "borderBottom": f"2px solid {COLORS['border']}"}),
-            html.Th("Difference (B − A)", style={
+            html.Th("Diff (percentile)", style={
                 "padding": "10px 12px", "textAlign": "center", "fontWeight": "700",
                 "backgroundColor": COLORS["soft_blue"], "color": COLORS["ink"],
                 "borderBottom": f"2px solid {COLORS['border']}"}),

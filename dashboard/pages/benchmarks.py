@@ -214,7 +214,30 @@ def layout():
                 "Compare peer pools and dimension score distributions. "
                 "Select an entity to view percentile rankings.",
                 style={"color": COLORS["gray"], "fontSize": "13px",
-                       "marginBottom": "20px", "fontFamily": FONT_FAMILY},
+                       "marginBottom": "16px", "fontFamily": FONT_FAMILY},
+            ),
+
+            # Explanatory banner — why raw scores are used here
+            html.Div(
+                style={
+                    "display": "flex", "alignItems": "flex-start",
+                    "lineHeight": "1.5",
+                    "padding": "12px 14px", "backgroundColor": "#eff6ff",
+                    "borderLeft": f"4px solid {COLORS['blue']}", "borderRadius": "4px",
+                    "color": COLORS["ink"], "fontSize": "12px",
+                    "fontFamily": FONT_FAMILY, "marginBottom": "20px",
+                },
+                children=[
+                    html.Span("\u2139\ufe0f ", style={"marginRight": "6px", "fontSize": "14px"}),
+                    html.Span([
+                        "Histograms display ",
+                        html.B("raw cosine similarity scores"),
+                        " rather than percentile ranks. Converting to percentiles would "
+                        "produce uniform distributions, hiding the shape of the data. "
+                        "The Leaderboard and Comparisons pages show percentile ranks "
+                        "for intuitive peer comparison.",
+                    ]),
+                ],
             ),
 
             # Controls row
@@ -490,18 +513,20 @@ def update_histograms(distributions, selected_entity, method, pool):
     if not distributions:
         return [go.Figure()] * 6
 
-    # Get entity scores if selected
-    entity_scores = {}
+    # Get entity scores if selected — extract raw values for histogram markers
+    entity_raw_scores = {}
     if selected_entity:
         entity_data = get_dna_advisor_scores(selected_entity, method=method)
         if entity_data:
-            entity_scores = entity_data.get("scores", {})
+            for d in DIMENSIONS:
+                v = entity_data.get("scores", {}).get(d, 0)
+                entity_raw_scores[d] = v.get("raw", 0) if isinstance(v, dict) else (v or 0)
 
     figs = []
     for dim in DIMENSIONS:
         # distributions returns {dim: [raw_score_list]}
         raw_scores = distributions.get(dim, [])
-        entity_score = entity_scores.get(dim)
+        entity_score = entity_raw_scores.get(dim)
         fig = _build_distribution_histogram(dim, raw_scores, entity_score=entity_score)
         figs.append(fig)
 
@@ -536,11 +561,15 @@ def update_percentile_section(selected_entity, method, pool, entity_type):
             })
         )
 
-    entity_scores = advisor_scores.get("scores", {})
+    # Extract raw scores from enriched response format
+    raw_entity_scores = {}
+    for d in DIMENSIONS:
+        v = advisor_scores.get("scores", {}).get(d, 0)
+        raw_entity_scores[d] = v.get("raw", 0) if isinstance(v, dict) else (v or 0)
     percentile_scores = percentile_data.get("scores", {})
 
     table = _build_peer_comparison_table(
-        entity_scores, percentile_scores, breakpoints, method
+        raw_entity_scores, percentile_scores, breakpoints, method
     )
 
     return {"display": "block", "marginTop": "28px"}, table

@@ -2,9 +2,11 @@
 
 Features:
 - Top-N entities per dimension with horizontal bar charts
-- Composite (average across all dimensions) leaderboard
-- Filterable by entity type, pool, and scoring method
+- Composite (average across all dimensions) leaderboard — computed server-side
+- Percentile rank labels on bars, raw score on hover
+- Selected bars stay full color; unselected fade to 30 % opacity
 - Click up to 2 entities on the chart to compare spider profiles below
+- Comparison table shows percentile, raw, and diff
 """
 
 import dash
@@ -19,9 +21,31 @@ dash.register_page(__name__, path="/leaderboard", title="Leaderboard")
 
 COMPARE_COLORS = [COLORS["blue"], "#D4376E"]
 
+_FADED_OPACITY = 0.30  # opacity for unselected bars
+
+
+def _ordinal(n):
+    """Return ordinal string for a percentile number (e.g. 92 -> '92nd')."""
+    n = int(round(n))
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
+
+
+def _hex_to_rgba(hex_color, alpha=1.0):
+    """Convert '#RRGGBB' to 'rgba(r,g,b,a)'."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
 
 def _create_bar_chart(data, dimension, method, selected_ids=None):
-    """Create a horizontal bar chart with #1 at top. Highlight selected entities."""
+    """Create a horizontal bar chart with percentile labels.
+
+    - Selected bars are full opacity in the dimension color.
+    - Unselected bars fade to 30 % opacity of the same color.
+    - Raw cosine score shown on hover, percentile ordinal as bar text.
+    """
     if not data:
         fig = go.Figure()
         fig.add_annotation(
@@ -38,55 +62,62 @@ def _create_bar_chart(data, dimension, method, selected_ids=None):
 
     selected_ids = selected_ids or []
 
-    # Sort descending, then REVERSE so plotly renders #1 at the top
-    sorted_data = sorted(data, key=lambda x: x.get("score", 0), reverse=True)
-    # Reverse for plotly horizontal bar (bottom-to-top rendering)
+    # Sort descending, then reverse for plotly bottom-to-top rendering
+    sorted_data = sorted(data, key=lambda x: x.get("percentile", 0) or 0, reverse=True)
     sorted_data = list(reversed(sorted_data))
 
     names = [item["advisor_name"] for item in sorted_data]
-    scores = [item.get("score", 0) for item in sorted_data]
+    percentiles = [item.get("percentile", 0) or 0 for item in sorted_data]
+    raw_scores = [item.get("score", 0) for item in sorted_data]
+    tiers = [item.get("tier", "") or "" for item in sorted_data]
     entity_ids = [item["advisor_id"] for item in sorted_data]
-    customdata = [[eid] for eid in entity_ids]
+    customdata = [[eid, raw, tier] for eid, raw, tier in zip(entity_ids, raw_scores, tiers)]
 
     if dimension == "composite":
-        base_color = COLORS["navy"]
-        title_text = f"Composite Score — {method.title()}"
+        base_hex = COLORS["navy"]
+        title_text = f"Composite Score — {method.title()} (Percentile Rank)"
     else:
-        base_color = DIM_COLORS.get(dimension, COLORS["blue"])
-        title_text = f"{DIM_LABELS.get(dimension, dimension)} — {method.title()}"
+        base_hex = DIM_COLORS.get(dimension, COLORS["blue"])
+        title_text = f"{DIM_LABELS.get(dimension, dimension)} — {method.title()} (Percentile Rank)"
 
-    # Per-bar colors: highlighted bars get their comparison color, others get base
+    # Per-bar colors: selected = full opacity, unselected = faded
     bar_colors = []
     line_widths = []
     line_colors = []
     for eid in entity_ids:
-        if eid in selected_ids:
-            idx = selected_ids.index(eid)
-            bar_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
-            line_widths.append(2.5)
-            line_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+        if not selected_ids or eid in selected_ids:
+            bar_colors.append(_hex_to_rgba(base_hex, 1.0))
+            line_widths.append(1.5 if eid in selected_ids else 1)
+            line_colors.append(base_hex)
         else:
-            bar_colors.append(base_color)
-            line_widths.append(1)
-            line_colors.append(COLORS["navy"])
+            bar_colors.append(_hex_to_rgba(base_hex, _FADED_OPACITY))
+            line_widths.append(0.5)
+            line_colors.append(_hex_to_rgba(base_hex, _FADED_OPACITY))
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        y=names, x=scores, orientation="h",
+        y=names, x=percentiles, orientation="h",
         marker=dict(color=bar_colors,
                     line=dict(color=line_colors, width=line_widths)),
-        text=[f"{s:.3f}" for s in scores],
+        text=[_ordinal(p) for p in percentiles],
         textposition="outside",
         textfont=dict(family=FONT_FAMILY, size=11, color=COLORS["ink"]),
-        hovertemplate="%{y}<br>Score: %{x:.3f}<extra></extra>",
-        customdata=customdata, name="Score",
+        hovertemplate=(
+            "%{y}<br>"
+            "Percentile: %{x:.0f}th<br>"
+            "Raw Score: %{customdata[1]:.4f}<br>"
+            "Tier: %{customdata[2]}"
+            "<extra></extra>"
+        ),
+        customdata=customdata, name="Percentile",
     ))
 
     fig.update_layout(
         title={"text": title_text,
                "x": 0.5, "xanchor": "center",
                "font": dict(size=16, color=COLORS["ink"], family=FONT_FAMILY)},
-        xaxis=dict(title="Score",
+        xaxis=dict(title="Percentile Rank",
+                   range=[0, 115],
                    titlefont=dict(family=FONT_FAMILY, size=12, color=COLORS["ink"]),
                    tickfont=dict(family=FONT_FAMILY, size=10, color=COLORS["gray"]),
                    gridcolor=COLORS["border"], showgrid=True, zeroline=False),
@@ -101,14 +132,17 @@ def _create_bar_chart(data, dimension, method, selected_ids=None):
 
 
 def _build_comparison_spider(profiles):
-    """Build overlaid spider chart for 1 or 2 profiles.
+    """Build overlaid spider chart for 1 or 2 profiles using percentile scores.
 
-    profiles: list of (name, scores_dict) tuples
+    profiles: list of (name, enriched_scores_dict) tuples
     """
     fig = go.Figure()
     for idx, (name, scores) in enumerate(profiles):
         color = COMPARE_COLORS[idx % len(COMPARE_COLORS)]
-        values = [scores.get(dim, 0) for dim in DIMENSIONS]
+        values = []
+        for dim in DIMENSIONS:
+            dim_data = scores.get(dim, {})
+            values.append(dim_data.get("percentile", 50) if isinstance(dim_data, dict) else dim_data)
         values.append(values[0])  # close the loop
         fig.add_trace(go.Scatterpolar(
             r=values,
@@ -116,17 +150,17 @@ def _build_comparison_spider(profiles):
             fill="toself", name=name,
             line={"color": color, "width": 2},
             fillcolor=color, opacity=0.4,
-            hovertemplate="%{theta}<br>Score: %{r:.3f}<extra></extra>",
+            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
         ))
 
     if len(profiles) == 1:
-        title_text = f"{profiles[0][0]} — Profile"
+        title_text = f"{profiles[0][0]} — Percentile Profile"
     else:
         title_text = f"{profiles[0][0]} vs {profiles[1][0]}"
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True,
+            radialaxis=dict(visible=True, range=[0, 100],
                             tickfont=dict(family=FONT_FAMILY, size=9, color=COLORS["gray"]),
                             gridcolor=COLORS["border"]),
             angularaxis=dict(tickfont=dict(family=FONT_FAMILY, size=10, color=COLORS["ink"])),
@@ -143,7 +177,7 @@ def _build_comparison_spider(profiles):
 
 
 def _build_score_table(profiles):
-    """Build a comparison score table for 1 or 2 profiles."""
+    """Build a comparison table showing percentile + raw per dimension."""
     header_cells = [html.Th("Dimension", style={
         "padding": "10px 12px", "textAlign": "left", "fontWeight": "700",
         "backgroundColor": COLORS["soft_blue"], "color": COLORS["ink"],
@@ -163,33 +197,60 @@ def _build_score_table(profiles):
             "borderBottom": f"2px solid {COLORS['border']}"}))
 
     rows = []
-    for dim in DIMENSIONS:
-        cells = [html.Td(DIM_LABELS[dim], style={
-            "padding": "10px 12px", "fontWeight": "500", "color": COLORS["ink"],
-            "borderBottom": f"1px solid {COLORS['border']}"})]
+    all_dims = list(DIMENSIONS) + ["composite"]
+    dim_labels_ext = {**DIM_LABELS, "composite": "Composite"}
 
-        vals = []
+    for dim in all_dims:
+        is_composite = dim == "composite"
+        cells = [html.Td(
+            dim_labels_ext.get(dim, dim),
+            style={
+                "padding": "10px 12px",
+                "fontWeight": "700" if is_composite else "500",
+                "color": COLORS["ink"],
+                "borderBottom": f"1px solid {COLORS['border']}",
+                "borderTop": f"2px solid {COLORS['border']}" if is_composite else "none",
+            })]
+
+        pctiles = []
         for idx, (_, scores) in enumerate(profiles):
-            v = scores.get(dim, 0)
-            vals.append(v)
+            dim_data = scores.get(dim, {})
+            if isinstance(dim_data, dict):
+                pctile = dim_data.get("percentile", 0) or 0
+                raw = dim_data.get("raw", 0) or 0
+            else:
+                pctile = 0
+                raw = dim_data
+            pctiles.append(pctile)
             color = COMPARE_COLORS[idx % len(COMPARE_COLORS)]
-            cells.append(html.Td(f"{v:.3f}", style={
-                "padding": "10px 12px", "textAlign": "center",
-                "fontWeight": "600", "color": color,
-                "borderBottom": f"1px solid {COLORS['border']}"}))
+            cells.append(html.Td(
+                html.Span([
+                    html.Span(f"{_ordinal(pctile)} ",
+                              style={"fontWeight": "700"}),
+                    html.Span(f"({raw:.3f})",
+                              style={"fontSize": "11px", "color": COLORS["gray"]}),
+                ]),
+                style={
+                    "padding": "10px 12px", "textAlign": "center",
+                    "color": color,
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                    "borderTop": f"2px solid {COLORS['border']}" if is_composite else "none",
+                }))
 
         if len(profiles) == 2:
-            diff = vals[1] - vals[0]
+            diff = pctiles[1] - pctiles[0]
             if diff > 0:
-                dc, dt = "#10b981", f"+{diff:.3f}"
+                dc, dt = "#10b981", f"+{diff:.0f}"
             elif diff < 0:
-                dc, dt = "#ef4444", f"{diff:.3f}"
+                dc, dt = "#ef4444", f"{diff:.0f}"
             else:
-                dc, dt = COLORS["gray"], "0.000"
+                dc, dt = COLORS["gray"], "0"
             cells.append(html.Td(dt, style={
                 "padding": "10px 12px", "textAlign": "center",
                 "fontWeight": "600", "color": dc,
-                "borderBottom": f"1px solid {COLORS['border']}"}))
+                "borderBottom": f"1px solid {COLORS['border']}",
+                "borderTop": f"2px solid {COLORS['border']}" if is_composite else "none",
+            }))
 
         rows.append(html.Tr(cells))
 
@@ -214,6 +275,7 @@ def layout():
                 "margin": "0 0 8px 0", "color": COLORS["ink"],
                 "fontSize": "24px", "fontFamily": FONT_FAMILY}),
             html.P("Top-performing entities across Advisor DNA dimensions. "
+                   "Bars show percentile rank among all peers. "
                    "The #1 and last-ranked entities are compared below — click any "
                    "name on the chart to swap a selection.",
                    style={"margin": "0", "color": COLORS["gray"],
@@ -322,47 +384,21 @@ def layout():
     prevent_initial_call="initial_duplicate",
 )
 def update_leaderboard_chart(dimension, method, entity_type, pool, top_n):
-    """Fetch leaderboard data, render bar chart, auto-select top & bottom."""
+    """Fetch leaderboard data from API (now includes composite + percentiles)."""
     min_peer_reviews = 20 if pool == "premier" else 0
-    request_n = max(top_n, 25) if dimension == "composite" else top_n
 
     data = get_leaderboard(
         method=method, entity_type=entity_type,
-        min_peer_reviews=min_peer_reviews, top_n=request_n,
+        min_peer_reviews=min_peer_reviews, top_n=top_n,
+        dimension=dimension,
     )
 
-    if dimension == "composite":
-        entity_totals = {}
-        for dim in DIMENSIONS:
-            for entry in (data.get(dim, []) if data else []):
-                eid = entry.get("advisor_id", "")
-                if not eid:
-                    continue
-                if eid not in entity_totals:
-                    entity_totals[eid] = {
-                        "advisor_name": entry.get("advisor_name", "Unknown"),
-                        "sum": 0.0, "count": 0,
-                    }
-                entity_totals[eid]["sum"] += entry.get("score", 0)
-                entity_totals[eid]["count"] += 1
-
-        composite_entries = []
-        for eid, info in entity_totals.items():
-            if info["count"] >= 3:
-                composite_entries.append({
-                    "advisor_id": eid,
-                    "advisor_name": info["advisor_name"],
-                    "score": info["sum"] / info["count"],
-                })
-
-        composite_entries.sort(key=lambda x: x["score"], reverse=True)
-        composite_entries = composite_entries[:top_n]
-        chart_entries = composite_entries
-    else:
-        chart_entries = data.get(dimension, []) if data else []
+    chart_entries = data.get(dimension, []) if data else []
 
     # Auto-select top and bottom entities
-    sorted_entries = sorted(chart_entries, key=lambda x: x.get("score", 0), reverse=True)
+    sorted_entries = sorted(chart_entries,
+                            key=lambda x: x.get("percentile", 0) or 0,
+                            reverse=True)
     entity_ids = [e["advisor_id"] for e in sorted_entries if e.get("advisor_id")]
     if len(entity_ids) >= 2:
         auto_selected = [entity_ids[0], entity_ids[-1]]
@@ -413,10 +449,11 @@ def on_chart_click(click_data, current_ids):
     Output("lb-chart", "figure", allow_duplicate=True),
     Input("lb-selected-ids", "data"),
     State("lb-chart", "figure"),
+    State("lb-dimension-dropdown", "value"),
     prevent_initial_call=True,
 )
-def restyle_bars_on_selection(selected_ids, fig):
-    """Highlight selected bars with comparison colors."""
+def restyle_bars_on_selection(selected_ids, fig, dimension):
+    """Fade unselected bars to 30 % opacity; keep selected at full opacity."""
     if not fig or not fig.get("data"):
         return no_update
     selected_ids = selected_ids or []
@@ -425,31 +462,24 @@ def restyle_bars_on_selection(selected_ids, fig):
     customdata = trace.get("customdata", [])
     entity_ids = [cd[0] if cd else "" for cd in customdata]
 
-    # Determine the base color (first non-selected bar's color, or navy fallback)
-    current_colors = trace.get("marker", {}).get("color", [])
-    if isinstance(current_colors, str):
-        base_color = current_colors
+    # Determine the base color hex
+    if dimension == "composite":
+        base_hex = COLORS["navy"]
     else:
-        # Find a bar that's not selected to get the base color
-        base_color = COLORS["navy"]
-        for i, eid in enumerate(entity_ids):
-            if eid not in selected_ids and i < len(current_colors):
-                base_color = current_colors[i]
-                break
+        base_hex = DIM_COLORS.get(dimension, COLORS["blue"])
 
     new_colors = []
     new_line_widths = []
     new_line_colors = []
     for eid in entity_ids:
-        if eid in selected_ids:
-            idx = selected_ids.index(eid)
-            new_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
-            new_line_widths.append(2.5)
-            new_line_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+        if not selected_ids or eid in selected_ids:
+            new_colors.append(_hex_to_rgba(base_hex, 1.0))
+            new_line_widths.append(1.5 if eid in selected_ids else 1)
+            new_line_colors.append(base_hex)
         else:
-            new_colors.append(base_color)
-            new_line_widths.append(1)
-            new_line_colors.append(COLORS["navy"])
+            new_colors.append(_hex_to_rgba(base_hex, _FADED_OPACITY))
+            new_line_widths.append(0.5)
+            new_line_colors.append(_hex_to_rgba(base_hex, _FADED_OPACITY))
 
     fig["data"][0]["marker"]["color"] = new_colors
     fig["data"][0]["marker"]["line"]["color"] = new_line_colors
@@ -463,7 +493,7 @@ def restyle_bars_on_selection(selected_ids, fig):
     Input("lb-method-dropdown", "value"),
 )
 def update_compare_panel(selected_ids, method):
-    """Fetch profiles for selected entities and show spider + table."""
+    """Fetch enriched profiles for selected entities and show spider + table."""
     selected_ids = selected_ids or []
     if not selected_ids:
         return [html.P(
@@ -471,7 +501,7 @@ def update_compare_panel(selected_ids, method):
             style={"color": COLORS["gray"], "fontSize": "13px",
                    "textAlign": "center", "padding": "16px"})]
 
-    profiles = []  # list of (name, scores_dict)
+    profiles = []  # list of (name, enriched_scores_dict)
     for eid in selected_ids:
         profile = get_dna_advisor_scores(eid, method=method)
         if profile:
@@ -488,7 +518,7 @@ def update_compare_panel(selected_ids, method):
     spider_fig = _build_comparison_spider(profiles)
     score_table = _build_score_table(profiles)
 
-    # Header with clear button
+    # Header
     if len(profiles) == 1:
         header_text = f"Profile: {profiles[0][0]}"
     else:

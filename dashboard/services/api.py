@@ -139,9 +139,11 @@ def get_benchmark_distributions(method: str = "mean", entity_type: str = "all",
 
 
 def get_leaderboard(method: str = "mean", entity_type: str = "all",
-                    min_peer_reviews: int = 0, top_n: int = 10) -> dict:
+                    min_peer_reviews: int = 0, top_n: int = 10,
+                    dimension: str = "all") -> dict:
     params = {"method": method, "entity_type": entity_type,
-              "min_peer_reviews": min_peer_reviews, "top_n": top_n}
+              "min_peer_reviews": min_peer_reviews, "top_n": top_n,
+              "dimension": dimension}
     return _get("/api/leaderboard", params=params) or {}
 
 
@@ -157,6 +159,12 @@ def get_partner_group_members(group_code: str, method: str = "mean") -> dict:
 def get_entity_comparison(entity_ids: list, method: str = "mean") -> list:
     return _get("/api/comparisons/entities",
                 params={"entity_ids": entity_ids, "method": method}) or []
+
+
+def get_head_to_head(entity_a: str, entity_b: str, method: str = "mean") -> dict:
+    return _get("/api/comparisons/head-to-head",
+                params={"entity_a": entity_a, "entity_b": entity_b,
+                        "method": method}) or {}
 
 
 # ---------------------------------------------------------------------------

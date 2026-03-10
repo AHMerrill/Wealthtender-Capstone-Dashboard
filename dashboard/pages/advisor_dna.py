@@ -920,7 +920,11 @@ def _update_main_view_inner(entity_id, method, display_mode, pool_mode,
 
         agg = get_dna_advisor_scores(entity_id, method)
         if agg and "scores" in agg:
-            dim_scores = {d: agg["scores"].get(d, 0) for d in DIMENSIONS}
+            # Enriched response: scores[dim] may be {"raw": ..., "percentile": ..., ...} or float
+            dim_scores = {}
+            for d in DIMENSIONS:
+                v = agg["scores"].get(d, 0)
+                dim_scores[d] = v.get("raw", 0) if isinstance(v, dict) else (v or 0)
         else:
             dim_scores = {d: sum(r.get(f"sim_{d}", 0) or 0 for r in reviews)
                           for d in DIMENSIONS}

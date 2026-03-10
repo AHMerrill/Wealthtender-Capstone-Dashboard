@@ -299,8 +299,10 @@ def leaderboard(
     entity_type: str = "all",
     min_peer_reviews: int = Query(0, ge=0),
     top_n: int = Query(10, ge=1, le=50),
+    dimension: str = "all",
 ):
-    return store.leaderboard(method, entity_type, min_peer_reviews, top_n)
+    return store.leaderboard(method, entity_type, min_peer_reviews, top_n,
+                             dimension=dimension)
 
 
 @app.get("/api/comparisons/partner-groups")
@@ -325,3 +327,15 @@ def entity_comparison(
     method: Literal["mean", "penalized", "weighted"] = "mean",
 ):
     return store.entity_comparison(entity_ids, method)
+
+
+@app.get("/api/comparisons/head-to-head")
+def head_to_head(
+    entity_a: str = Query(...),
+    entity_b: str = Query(...),
+    method: Literal["mean", "penalized", "weighted"] = "mean",
+):
+    result = store.head_to_head(entity_a, entity_b, method)
+    if result is None:
+        raise HTTPException(status_code=404, detail="one or both entities not found")
+    return result

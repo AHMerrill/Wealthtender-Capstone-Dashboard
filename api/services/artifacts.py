@@ -384,6 +384,79 @@ class ArtifactStore:
     ]
     _REVIEW_SIM_COLS = [f"sim_{d}" for d in _SIM_DIMS]
 
+    # ------------------------------------------------------------------
+    # Score enrichment helpers (percentile, normalized, tier)
+    # ------------------------------------------------------------------
+
+    _TIER_LABELS = ("Very Strong", "Strong", "Moderate", "Foundational")
+
+    def _tier_from_percentile(self, pctile: float) -> str:
+        """Assign a tier label from a percentile rank (0-100)."""
+        if pctile >= 75:
+            return self._TIER_LABELS[0]
+        if pctile >= 50:
+            return self._TIER_LABELS[1]
+        if pctile >= 25:
+            return self._TIER_LABELS[2]
+        return self._TIER_LABELS[3]
+
+    def _enrich_scores(self, entity_id: str, method: str,
+                       raw_scores: Dict[str, float]) -> Dict[str, Dict]:
+        """Enrich raw dimension scores with percentile, normalized, and tier.
+
+        Returns a dict keyed by dimension with sub-dict:
+            {"raw", "percentile", "normalized", "tier"}
+        """
+        if self.advisor_dim_scores.empty:
+            return {d: {"raw": v, "percentile": None, "normalized": None,
+                        "tier": None} for d, v in raw_scores.items()}
+
+        row = self.advisor_dim_scores[
+            self.advisor_dim_scores["advisor_id"] == entity_id]
+        if row.empty:
+            return {d: {"raw": v, "percentile": None, "normalized": None,
+                        "tier": None} for d, v in raw_scores.items()}
+
+        entity_type = row.iloc[0]["entity_type"]
+        peers = self.advisor_dim_scores[
+            self.advisor_dim_scores["entity_type"] == entity_type].copy()
+
+        enriched = {}
+        for d in self._SIM_DIMS:
+            col = f"sim_{method}_{d}"
+            raw = raw_scores.get(d, 0.0)
+            if col not in peers.columns or peers[col].dropna().empty:
+                enriched[d] = {"raw": raw, "percentile": None,
+                               "normalized": None, "tier": None}
+                continue
+
+            # Percentile rank (0-100)
+            peers[f"_prank_{d}"] = peers[col].rank(pct=True)
+            entity_row = peers[peers["advisor_id"] == entity_id]
+            pctile = round(float(entity_row.iloc[0][f"_prank_{d}"]) * 100, 1) \
+                if not entity_row.empty else 0.0
+
+            # Normalized 0-100 (min-max rescale across same entity_type)
+            col_min = float(peers[col].min())
+            col_max = float(peers[col].max())
+            if col_max > col_min:
+                norm = round((raw - col_min) / (col_max - col_min) * 100, 1)
+            else:
+                norm = 50.0  # all peers identical
+
+            enriched[d] = {
+                "raw": round(raw, 6),
+                "percentile": pctile,
+                "normalized": norm,
+                "tier": self._tier_from_percentile(pctile),
+            }
+        return enriched
+
+    def _compute_composite(self, raw_scores: Dict[str, float]) -> float:
+        """Mean across all 6 dimensions (mirrors former frontend calculation)."""
+        vals = [raw_scores.get(d, 0.0) for d in self._SIM_DIMS]
+        return sum(vals) / len(vals) if vals else 0.0
+
     def dna_macro_sample(self, n: int = 100, seed: int = 42) -> list:
         """Return a sampled subset of reviews (for macro-level network visualizations).
 
@@ -452,6 +525,12 @@ class ArtifactStore:
         return _sanitize_records(df[[c for c in cols if c in df.columns]])
 
     def dna_advisor_scores(self, entity_id: str, method: str = "mean") -> Optional[Dict]:
+        """Return dimension scores enriched with percentile, normalized, and tier.
+
+        Response shape per dimension:
+            {"raw": float, "percentile": float, "normalized": float, "tier": str}
+        Also includes a composite score with the same enrichment.
+        """
         if self.advisor_dim_scores.empty:
             return None
         df = self.advisor_dim_scores[self.advisor_dim_scores["advisor_id"] == entity_id]
@@ -462,13 +541,49 @@ class ArtifactStore:
         missing = [c for c in sim_cols if c not in df.columns]
         if missing:
             return None
-        scores = {d: float(row[f"sim_{method}_{d}"]) for d in self._SIM_DIMS}
+        raw_scores = {d: float(row[f"sim_{method}_{d}"]) for d in self._SIM_DIMS}
+        enriched = self._enrich_scores(entity_id, method, raw_scores)
+
+        # Composite (average of raw scores, then enrich vs peers)
+        composite_raw = self._compute_composite(raw_scores)
+        # Compute composite percentile/normalized vs all peers of same type
+        entity_type = row["entity_type"]
+        peers = self.advisor_dim_scores[
+            self.advisor_dim_scores["entity_type"] == entity_type].copy()
+        comp_pctile = None
+        comp_norm = None
+        comp_tier = None
+        if not peers.empty:
+            peer_composites = peers.apply(
+                lambda r: sum(float(r.get(f"sim_{method}_{d}", 0))
+                              for d in self._SIM_DIMS) / len(self._SIM_DIMS),
+                axis=1)
+            peers["_composite"] = peer_composites
+            peers["_comp_rank"] = peers["_composite"].rank(pct=True)
+            entity_row = peers[peers["advisor_id"] == entity_id]
+            if not entity_row.empty:
+                comp_pctile = round(float(entity_row.iloc[0]["_comp_rank"]) * 100, 1)
+                c_min, c_max = float(peers["_composite"].min()), float(peers["_composite"].max())
+                if c_max > c_min:
+                    comp_norm = round((composite_raw - c_min) / (c_max - c_min) * 100, 1)
+                else:
+                    comp_norm = 50.0
+                comp_tier = self._tier_from_percentile(comp_pctile)
+
+        enriched["composite"] = {
+            "raw": round(composite_raw, 6),
+            "percentile": comp_pctile,
+            "normalized": comp_norm,
+            "tier": comp_tier,
+        }
+
         return {
             "advisor_id": row["advisor_id"],
             "advisor_name": row["advisor_name"],
             "entity_type": row["entity_type"],
             "method": method,
-            "scores": scores,
+            "review_count": int(row.get("review_count", 0)),
+            "scores": enriched,
         }
 
     def dna_percentile_scores(self, entity_id: str, method: str = "mean",
@@ -654,8 +769,15 @@ class ArtifactStore:
         return result
 
     def leaderboard(self, method: str = "mean", entity_type: str = "all",
-                    min_peer_reviews: int = 0, top_n: int = 10) -> Dict:
-        """Top-N entities per dimension."""
+                    min_peer_reviews: int = 0, top_n: int = 10,
+                    dimension: str = "all") -> Dict:
+        """Top-N entities per dimension (or composite).
+
+        dimension: "all" returns all 6 + composite, or pass a single dim key
+                   or "composite" to get just that one.
+
+        Each entry is enriched with percentile, normalized, and tier.
+        """
         if self.advisor_dim_scores.empty:
             return {}
         df = self.advisor_dim_scores.copy()
@@ -663,22 +785,78 @@ class ArtifactStore:
             df = df[df["entity_type"] == entity_type]
         if min_peer_reviews > 0 and "review_count" in df.columns:
             df = df[df["review_count"] >= min_peer_reviews]
-        result = {}
+        if df.empty:
+            return {}
+
+        # Pre-compute percentile ranks and normalized scores for the pool
+        pctile_ranks = {}
+        norm_scores = {}
         for d in self._SIM_DIMS:
             col = f"sim_{method}_{d}"
             if col not in df.columns:
                 continue
-            top = df.nlargest(top_n, col)
+            df[f"_prank_{d}"] = df[col].rank(pct=True)
+            pctile_ranks[d] = f"_prank_{d}"
+            col_min, col_max = float(df[col].min()), float(df[col].max())
+            if col_max > col_min:
+                df[f"_norm_{d}"] = (df[col] - col_min) / (col_max - col_min) * 100
+            else:
+                df[f"_norm_{d}"] = 50.0
+            norm_scores[d] = f"_norm_{d}"
+
+        # Composite column
+        sim_cols = [f"sim_{method}_{d}" for d in self._SIM_DIMS
+                    if f"sim_{method}_{d}" in df.columns]
+        if sim_cols:
+            df["_composite_raw"] = df[sim_cols].mean(axis=1)
+            df["_composite_prank"] = df["_composite_raw"].rank(pct=True)
+            c_min, c_max = float(df["_composite_raw"].min()), float(df["_composite_raw"].max())
+            if c_max > c_min:
+                df["_composite_norm"] = (df["_composite_raw"] - c_min) / (c_max - c_min) * 100
+            else:
+                df["_composite_norm"] = 50.0
+
+        def _build_entries(sub_df, dim_key, score_col):
             entries = []
-            for _, row in top.iterrows():
+            for _, row in sub_df.iterrows():
+                raw = float(row[score_col])
+                if dim_key == "composite":
+                    pctile = round(float(row["_composite_prank"]) * 100, 1)
+                    norm = round(float(row["_composite_norm"]), 1)
+                else:
+                    pctile = round(float(row[f"_prank_{dim_key}"]) * 100, 1) \
+                        if f"_prank_{dim_key}" in row.index else None
+                    norm = round(float(row[f"_norm_{dim_key}"]), 1) \
+                        if f"_norm_{dim_key}" in row.index else None
+                tier = self._tier_from_percentile(pctile) if pctile is not None else None
                 entries.append({
                     "advisor_id": row["advisor_id"],
                     "advisor_name": row["advisor_name"],
                     "entity_type": row["entity_type"],
-                    "score": float(row[col]),
+                    "score": round(raw, 6),
+                    "percentile": pctile,
+                    "normalized": norm,
+                    "tier": tier,
                     "review_count": int(row.get("review_count", 0)),
                 })
-            result[d] = entries
+            return entries
+
+        dims_to_compute = self._SIM_DIMS if dimension in ("all",) else (
+            [] if dimension == "composite" else [dimension])
+
+        result = {}
+        for d in dims_to_compute:
+            col = f"sim_{method}_{d}"
+            if col not in df.columns:
+                continue
+            top = df.nlargest(top_n, col)
+            result[d] = _build_entries(top, d, col)
+
+        # Add composite if requested
+        if dimension in ("all", "composite") and "_composite_raw" in df.columns:
+            top_comp = df.nlargest(top_n, "_composite_raw")
+            result["composite"] = _build_entries(top_comp, "composite", "_composite_raw")
+
         return result
 
     def leaderboard_entity_profile(self, entity_id: str,
@@ -717,13 +895,46 @@ class ArtifactStore:
 
     def entity_comparison(self, entity_ids: List[str],
                            method: str = "mean") -> List[Dict]:
-        """Return dimension scores for multiple entities for comparison."""
+        """Return enriched dimension scores for multiple entities for comparison."""
         results = []
         for eid in entity_ids:
             scores = self.dna_advisor_scores(eid, method)
             if scores:
                 results.append(scores)
         return results
+
+    def head_to_head(self, entity_id_a: str, entity_id_b: str,
+                     method: str = "mean") -> Optional[Dict]:
+        """Full head-to-head comparison with diffs for every score type.
+
+        Returns both entities' enriched profiles plus a diff dict showing
+        the difference (B - A) for raw, percentile, and normalized per dimension.
+        """
+        a = self.dna_advisor_scores(entity_id_a, method)
+        b = self.dna_advisor_scores(entity_id_b, method)
+        if not a or not b:
+            return None
+
+        diffs = {}
+        for d in list(self._SIM_DIMS) + ["composite"]:
+            a_scores = a["scores"].get(d, {})
+            b_scores = b["scores"].get(d, {})
+            diff_entry = {}
+            for key in ("raw", "percentile", "normalized"):
+                a_val = a_scores.get(key)
+                b_val = b_scores.get(key)
+                if a_val is not None and b_val is not None:
+                    diff_entry[key] = round(b_val - a_val, 4)
+                else:
+                    diff_entry[key] = None
+            diffs[d] = diff_entry
+
+        return {
+            "entity_a": a,
+            "entity_b": b,
+            "diffs": diffs,
+            "method": method,
+        }
 
     # ----------------------------------------------------------------------------------
     # EDA
