@@ -361,6 +361,7 @@ def update_team_charts(group_code, method):
         scores = member.get("scores", {})
         values = [_get_dim_val(scores, dim, "percentile") for dim in DIMENSIONS]
         values.append(values[0])  # close loop
+        ordinals = [_ordinal(v) for v in values]
 
         spider_fig.add_trace(go.Scatterpolar(
             r=values,
@@ -368,7 +369,8 @@ def update_team_charts(group_code, method):
             fill="toself", name=name,
             line={"color": colors[idx], "width": 2},
             fillcolor=colors[idx], opacity=0.5,
-            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
+            customdata=ordinals,
+            hovertemplate="%{theta}<br>Percentile: %{customdata}<extra></extra>",
         ))
 
     spider_fig.update_layout(
@@ -515,12 +517,14 @@ def update_entity_comparison(entity_a_id, entity_b_id, method):
     ]:
         values = [_extract_score(entity_data.get(dim, {}), "percentile") for dim in DIMENSIONS]
         values.append(values[0])
+        ordinals = [_ordinal(v) for v in values]
         spider_fig.add_trace(go.Scatterpolar(
             r=values,
             theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
             fill="toself", name=name,
             line={"color": color, "width": 2}, fillcolor=color, opacity=0.4,
-            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
+            customdata=ordinals,
+            hovertemplate="%{theta}<br>Percentile: %{customdata}<extra></extra>",
         ))
 
     spider_fig.update_layout(

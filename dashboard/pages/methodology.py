@@ -272,6 +272,39 @@ SECTIONS = [
                 "Leaderboard defaults to composite ranking, providing a single overall measure "
                 "of advisor performance."
             ),
+            html.H4("Known Limitations of Cosine Similarity Scoring",
+                     style={"marginTop": "20px", "color": COLORS["navy"]}),
+            html.P(
+                "Cosine similarity measures semantic overlap between a review's language "
+                "and each dimension's query text. This means scores reflect how strongly "
+                "the review's wording aligns with the dimension definition — not whether "
+                "the review is positive or negative overall. A glowing five-star review "
+                "that simply says 'Great advisor, highly recommend!' will score low across "
+                "all dimensions because the language is too general to match any specific "
+                "dimension definition."
+            ),
+            html.P(
+                "Short reviews are disproportionately affected. A two-sentence review "
+                "like 'She is patient and understanding' clearly implies empathy and trust "
+                "to a human reader, but produces weak cosine similarity because there are "
+                "not enough tokens to create meaningful semantic overlap with the detailed "
+                "dimension query strings."
+            ),
+            html.P(
+                "This also means an entity with many short, positive reviews may rank "
+                "lower than one with fewer but longer, more descriptive reviews. The model "
+                "rewards specificity and detail, not just positive sentiment."
+            ),
+            html.P([
+                html.B("Future improvement: "),
+                "An LLM-based pipeline could address these limitations by having a large "
+                "language model read each review, identify which dimensions are discussed "
+                "(even implicitly), and assign structured scores with reasoning. This would "
+                "capture implied meaning that cosine similarity misses — for example, "
+                "recognizing that 'patient and understanding' implies strong empathy even "
+                "without using empathy-specific vocabulary. See the README for an outline "
+                "of this alternative pipeline."
+            ]),
         ],
     },
     {

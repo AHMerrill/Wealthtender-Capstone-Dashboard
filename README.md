@@ -272,6 +272,36 @@ A typical live pipeline would look like: new reviews land in the database → a 
 | `life_event_support` | Life Event Support |
 | `investment_expertise` | Investment Expertise |
 
+### Known Limitations of Cosine Similarity Scoring
+
+Cosine similarity measures **semantic overlap** between a review's language and each dimension's query definition. This is fundamentally different from understanding what a review *means*. Key implications:
+
+- **Short reviews score low regardless of sentiment.** A five-star review saying "Great advisor, highly recommend!" has too few tokens to produce meaningful cosine similarity against any dimension's detailed query text. The model rewards *specificity and volume of language*, not positive sentiment.
+- **Implied meaning is invisible.** A review like "She is patient and understanding" clearly implies empathy and trust to a human reader, but the model only detects direct semantic overlap with the dimension query strings. If the review doesn't use vocabulary close to the query text, the score stays low.
+- **Entities with many short reviews rank lower than entities with fewer but longer, more detailed reviews.** This creates a systematic bias toward entities whose clients write more descriptive feedback.
+- **Tier labels can be misleading.** An entity rated "Moderate" on Trust & Integrity may have universally positive reviews that simply don't use trust-specific language. "Moderate" reflects *how much trust was explicitly discussed*, not whether clients actually trust the advisor.
+
+These are inherent limitations of embedding-based cosine similarity — not bugs. The approach works best when reviews are detailed enough to contain dimension-specific language. For a more robust alternative, see the next section.
+
+### Alternative: LLM-Based Scoring Pipeline
+
+A large language model (LLM) can address the limitations above by *reading and reasoning about* each review rather than measuring surface-level semantic overlap. Here is an outline of how such a pipeline would work:
+
+**Step 1: Structured Review Analysis**
+For each review, prompt an LLM (e.g., GPT-4, Claude) with the review text and the six dimension definitions. Ask it to return a structured JSON response identifying which dimensions are discussed (explicitly or implicitly), a 1-5 score per dimension, and a brief justification for each score. Reviews that don't mention a dimension get a null rather than a low score — this distinguishes "not discussed" from "discussed negatively."
+
+**Step 2: Confidence-Weighted Aggregation**
+At the entity level, aggregate dimension scores across all reviews using only reviews where that dimension was identified as present. This avoids the current problem where short positive reviews drag down an entity's score by contributing near-zero similarity on dimensions that simply weren't mentioned. Weight by review length, recency, or LLM confidence as appropriate.
+
+**Step 3: Calibration**
+Use a sample of human-labeled reviews to calibrate the LLM's scores. Measure agreement between human raters and the model, adjusting the prompt or scoring rubric until inter-rater reliability is acceptable. This step is critical for stakeholder trust.
+
+**Step 4: Hybrid Approach (Optional)**
+Combine embedding-based scores (fast, cheap, deterministic) with LLM-based scores (slower, costlier, more accurate) by using embeddings as a first pass and LLM analysis for reviews that score ambiguously or for entities near tier boundaries.
+
+**Cost and Latency Considerations:**
+LLM scoring is significantly more expensive than cosine similarity (~$0.01-0.05 per review vs. effectively free). For Wealthtender's current corpus (~4,200 reviews), a full LLM scoring run would cost roughly $40-200 depending on the model and prompt length. This is a one-time batch cost, not per-request — scored results would be stored in a database and served by the same API layer. Incremental scoring of new reviews as they arrive would cost fractions of a cent each.
+
 ---
 
 ## 6. Shared Constants & Branding

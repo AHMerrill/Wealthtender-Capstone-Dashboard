@@ -73,7 +73,8 @@ def _create_bar_chart(data, dimension, method, selected_ids=None):
     raw_scores = [item.get("score", 0) for item in sorted_data]
     tiers = [item.get("tier", "") or "" for item in sorted_data]
     entity_ids = [item["advisor_id"] for item in sorted_data]
-    customdata = [[eid, raw, tier] for eid, raw, tier in zip(entity_ids, raw_scores, tiers)]
+    ordinals = [_ordinal(p) for p in percentiles]
+    customdata = [[eid, raw, tier, ordi] for eid, raw, tier, ordi in zip(entity_ids, raw_scores, tiers, ordinals)]
 
     if dimension == "composite":
         base_hex = COLORS["navy"]
@@ -106,7 +107,7 @@ def _create_bar_chart(data, dimension, method, selected_ids=None):
         textfont=dict(family=FONT_FAMILY, size=11, color=COLORS["ink"]),
         hovertemplate=(
             "%{y}<br>"
-            "Percentile: %{x:.0f}th<br>"
+            "Percentile: %{customdata[3]}<br>"
             "Raw Score: %{customdata[1]:.4f}<br>"
             "Tier: %{customdata[2]}"
             "<extra></extra>"
@@ -146,13 +147,15 @@ def _build_comparison_spider(profiles):
             dim_data = scores.get(dim, {})
             values.append(dim_data.get("percentile", 50) if isinstance(dim_data, dict) else dim_data)
         values.append(values[0])  # close the loop
+        ordinals = [_ordinal(v) for v in values]
         fig.add_trace(go.Scatterpolar(
             r=values,
             theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
             fill="toself", name=name,
             line={"color": color, "width": 2},
             fillcolor=color, opacity=0.4,
-            hovertemplate="%{theta}<br>Percentile: %{r:.0f}th<extra></extra>",
+            customdata=ordinals,
+            hovertemplate="%{theta}<br>Percentile: %{customdata}<extra></extra>",
         ))
 
     if len(profiles) == 1:
