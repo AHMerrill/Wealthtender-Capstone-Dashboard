@@ -30,12 +30,89 @@ SECTIONS = [
                 "authenticated REST endpoints."
             ),
             html.P(
-                "The analytical pipeline operates in two phases. First, an offline scoring "
-                "notebook generates dimension scores for every review and entity using "
-                "sentence-transformer embeddings. Second, the dashboard consumes those "
-                "pre-built artifacts at runtime, computing percentiles, tier labels, and "
-                "aggregate statistics on the fly without re-running the NLP models."
+                "The analytical pipeline operates in three phases. First, an EDA and embedding "
+                "notebook (NLP_I.ipynb) cleans the raw review data, performs lexical analysis, "
+                "and generates sentence-transformer embeddings for all reviews. Second, a scoring "
+                "notebook (query_embeddings_vs_review_embeddings.ipynb) computes cosine similarity "
+                "between review embeddings and six dimension query strings, then aggregates scores "
+                "to the entity level. Third, the dashboard consumes those pre-built artifacts at "
+                "runtime, computing percentiles, tier labels, and aggregate statistics on the fly "
+                "without re-running any NLP models."
             ),
+        ],
+    },
+    {
+        "id": "pipeline",
+        "title": "Analysis Pipeline & Source Files",
+        "content": [
+            html.P(
+                "The full analysis pipeline runs across three Jupyter notebooks in sequence, "
+                "producing static CSV and JSON artifacts that the API loads at startup. "
+                "No model inference happens at runtime — all NLP processing is offline."
+            ),
+            html.H4("Step 1: Data Cleaning & EDA",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P([
+                html.B("Notebook: "),
+                "notebooks/NLP_I.ipynb (Sections 1.1–1.6)"
+            ]),
+            html.P(
+                "Raw Wealthtender review exports are cleaned (date filtering, deduplication, "
+                "whitespace normalization, HTML entity unescaping), tokenized, and analyzed. "
+                "This step produces the cleaned review dataset (reviews_clean.csv), word count "
+                "distributions, n-gram frequency tables (unigrams, bigrams, trigrams), and "
+                "data quality/coverage reports. These outputs are stored in artifacts/macro_insights/ "
+                "and power the EDA page of the dashboard."
+            ),
+            html.H4("Step 2: Embedding Generation",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P([
+                html.B("Notebook: "),
+                "notebooks/NLP_I.ipynb (Section 2: Semantic Relationship Discovery)"
+            ]),
+            html.P(
+                "Each cleaned review is encoded into a 384-dimensional vector using the "
+                "all-MiniLM-L6-v2 sentence-transformer model. Reviews are encoded in batches, "
+                "with advisor names removed from the text before encoding to prevent name-based "
+                "bias. Both review-level and advisor-level embeddings are exported as Parquet "
+                "files for efficient reuse by downstream scoring notebooks."
+            ),
+            html.H4("Step 3: Dimension Scoring",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P([
+                html.B("Notebook: "),
+                "notebooks/collaborator/query_embeddings_vs_review_embeddings.ipynb"
+            ]),
+            html.P(
+                "Six carefully crafted dimension query strings are encoded into the same "
+                "embedding space. Cosine similarity is computed between every review embedding "
+                "and each of the six query embeddings, producing a score matrix. Scores are "
+                "then aggregated to the entity level using three methods (mean, penalized, "
+                "weighted). The outputs — review_dimension_scores.csv and "
+                "advisor_dimension_scores.csv — are stored in artifacts/scoring/ and serve as "
+                "the foundation for all dashboard visualizations."
+            ),
+            html.H4("Step 4: Runtime Enrichment",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P([
+                html.B("Source: "),
+                "api/services/artifacts.py"
+            ]),
+            html.P(
+                "At startup, the FastAPI backend loads all CSV and JSON artifacts into memory. "
+                "When a request arrives, it computes percentile ranks (via pandas rank), "
+                "min-max normalized scores, and tier labels on the fly — no NLP models are "
+                "invoked. The dashboard then renders these enriched scores as interactive "
+                "charts, leaderboards, and comparison views."
+            ),
+            html.H4("Additional Notebooks",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P([
+                html.B("notebooks/Scoring_Exploration.ipynb"),
+                " — Experimental notebook exploring alternative scoring approaches "
+                "(KMeans clustering, cosine similarity experiments). Not part of the "
+                "production pipeline but preserved for reference."
+            ]),
         ],
     },
     {
