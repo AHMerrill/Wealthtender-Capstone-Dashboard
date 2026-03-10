@@ -1159,55 +1159,15 @@ def _build_evidence_cards(sorted_reviews, dim_key, top_n=3):
     ])
 
 
-@callback(
-    Output("dna-attr-panel", "style"),
-    Output("dna-attr-title", "children"),
-    Output("dna-attr-query", "children"),
-    Output("dna-evidence-cards", "children"),
-    Output("dna-review-selector", "options"),
-    Output("dna-review-selector", "value"),
-    Output("dna-selected-dim", "data"),
-    Output("dna-review-panel", "style", allow_duplicate=True),
-    Input("dna-entity-chart", "clickData"),
-    Input({"type": "entity-dim-card", "dim": ALL}, "n_clicks"),
-    State("dna-entity-reviews-store", "data"),
-    prevent_initial_call=True,
-)
-def handle_entity_pie_click(pie_click, card_clicks, reviews):
-    _no = (no_update,) * 8
-    if not reviews:
-        return _no
+def _build_dim_panel(reviews, dim_key):
+    """Build the dimension detail panel content for a given dimension.
 
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return _no
-
-    trigger = ctx.triggered[0]["prop_id"]
-    dim_key = None
-
-    if "dna-entity-chart" in trigger:
-        if not pie_click:
-            return _no
-        points = pie_click.get("points", [])
-        if not points:
-            return _no
-        label = points[0].get("y", "") or points[0].get("label", "")
-        dim_key = _DIM_LABEL_TO_KEY.get(label)
-    else:
-        import json as _json
-        try:
-            parsed = _json.loads(trigger.split(".")[0])
-            dim_key = parsed.get("dim")
-        except Exception:
-            return _no
-
-    if not dim_key:
-        return _no
-
+    Returns the 8-tuple used by the attr panel outputs:
+    (panel_style, title, query, evidence, options, value, dim_key, review_panel_style)
+    """
     sim_col = f"sim_{dim_key}"
     sorted_reviews = sorted(reviews, key=lambda r: r.get(sim_col, 0) or 0, reverse=True)
 
-    # Build evidence cards for top 3
     evidence = _build_evidence_cards(sorted_reviews, dim_key, top_n=3)
 
     options = []
@@ -1239,6 +1199,103 @@ def handle_entity_pie_click(pie_click, card_clicks, reviews):
         dim_key,
         _HIDE,
     )
+
+
+def _active_card_styles(selected_dim):
+    """Return a list of styles for each entity-dim-card, highlighting the selected one."""
+    styles = []
+    for d in DIMENSIONS:
+        if d == selected_dim:
+            styles.append({
+                "padding": "8px 10px", "borderRadius": "6px",
+                "border": f"2px solid {DIM_COLORS[d]}",
+                "backgroundColor": f"{DIM_COLORS[d]}15",
+                "cursor": "pointer", "textAlign": "left", "width": "100%",
+                "boxShadow": f"0 0 0 2px {DIM_COLORS[d]}40",
+            })
+        else:
+            styles.append({
+                "padding": "8px 10px", "borderRadius": "6px",
+                "border": f"2px solid {DIM_COLORS[d]}",
+                "backgroundColor": "white",
+                "cursor": "pointer", "textAlign": "left", "width": "100%",
+            })
+    return styles
+
+
+@callback(
+    Output("dna-attr-panel", "style"),
+    Output("dna-attr-title", "children"),
+    Output("dna-attr-query", "children"),
+    Output("dna-evidence-cards", "children"),
+    Output("dna-review-selector", "options"),
+    Output("dna-review-selector", "value"),
+    Output("dna-selected-dim", "data"),
+    Output("dna-review-panel", "style", allow_duplicate=True),
+    Output({"type": "entity-dim-card", "dim": ALL}, "style"),
+    Input("dna-entity-chart", "clickData"),
+    Input({"type": "entity-dim-card", "dim": ALL}, "n_clicks"),
+    State("dna-entity-reviews-store", "data"),
+    prevent_initial_call=True,
+)
+def handle_entity_pie_click(pie_click, card_clicks, reviews):
+    _no = (no_update,) * 9
+    if not reviews:
+        return _no
+
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return _no
+
+    trigger = ctx.triggered[0]["prop_id"]
+    dim_key = None
+
+    if "dna-entity-chart" in trigger:
+        if not pie_click:
+            return _no
+        points = pie_click.get("points", [])
+        if not points:
+            return _no
+        label = points[0].get("y", "") or points[0].get("label", "")
+        dim_key = _DIM_LABEL_TO_KEY.get(label)
+    else:
+        import json as _json
+        try:
+            parsed = _json.loads(trigger.split(".")[0])
+            dim_key = parsed.get("dim")
+        except Exception:
+            return _no
+
+    if not dim_key:
+        return _no
+
+    panel = _build_dim_panel(reviews, dim_key)
+    card_styles = _active_card_styles(dim_key)
+    return panel + (card_styles,)
+
+
+@callback(
+    Output("dna-attr-panel", "style", allow_duplicate=True),
+    Output("dna-attr-title", "children", allow_duplicate=True),
+    Output("dna-attr-query", "children", allow_duplicate=True),
+    Output("dna-evidence-cards", "children", allow_duplicate=True),
+    Output("dna-review-selector", "options", allow_duplicate=True),
+    Output("dna-review-selector", "value", allow_duplicate=True),
+    Output("dna-selected-dim", "data", allow_duplicate=True),
+    Output("dna-review-panel", "style", allow_duplicate=True),
+    Output({"type": "entity-dim-card", "dim": ALL}, "style", allow_duplicate=True),
+    Input("dna-entity-reviews-store", "data"),
+    prevent_initial_call=True,
+)
+def auto_expand_first_dim(reviews):
+    """Auto-expand the first dimension (trust_integrity) when an entity loads."""
+    if not reviews:
+        return (no_update,) * 9
+
+    dim_key = DIMENSIONS[0]  # trust_integrity
+    panel = _build_dim_panel(reviews, dim_key)
+    card_styles = _active_card_styles(dim_key)
+    return panel + (card_styles,)
 
 
 # ---------------------------------------------------------------------------

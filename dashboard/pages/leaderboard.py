@@ -20,8 +20,8 @@ dash.register_page(__name__, path="/leaderboard", title="Leaderboard")
 COMPARE_COLORS = [COLORS["blue"], "#D4376E"]
 
 
-def _create_bar_chart(data, dimension, method):
-    """Create a horizontal bar chart with #1 at top."""
+def _create_bar_chart(data, dimension, method, selected_ids=None):
+    """Create a horizontal bar chart with #1 at top. Highlight selected entities."""
     if not data:
         fig = go.Figure()
         fig.add_annotation(
@@ -36,6 +36,8 @@ def _create_bar_chart(data, dimension, method):
         )
         return fig
 
+    selected_ids = selected_ids or []
+
     # Sort descending, then REVERSE so plotly renders #1 at the top
     sorted_data = sorted(data, key=lambda x: x.get("score", 0), reverse=True)
     # Reverse for plotly horizontal bar (bottom-to-top rendering)
@@ -47,17 +49,32 @@ def _create_bar_chart(data, dimension, method):
     customdata = [[eid] for eid in entity_ids]
 
     if dimension == "composite":
-        bar_color = COLORS["navy"]
+        base_color = COLORS["navy"]
         title_text = f"Composite Score — {method.title()}"
     else:
-        bar_color = DIM_COLORS.get(dimension, COLORS["blue"])
+        base_color = DIM_COLORS.get(dimension, COLORS["blue"])
         title_text = f"{DIM_LABELS.get(dimension, dimension)} — {method.title()}"
+
+    # Per-bar colors: highlighted bars get their comparison color, others get base
+    bar_colors = []
+    line_widths = []
+    line_colors = []
+    for eid in entity_ids:
+        if eid in selected_ids:
+            idx = selected_ids.index(eid)
+            bar_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+            line_widths.append(2.5)
+            line_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+        else:
+            bar_colors.append(base_color)
+            line_widths.append(1)
+            line_colors.append(COLORS["navy"])
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
         y=names, x=scores, orientation="h",
-        marker=dict(color=bar_color,
-                    line=dict(color=COLORS["navy"], width=1)),
+        marker=dict(color=bar_colors,
+                    line=dict(color=line_colors, width=line_widths)),
         text=[f"{s:.3f}" for s in scores],
         textposition="outside",
         textfont=dict(family=FONT_FAMILY, size=11, color=COLORS["ink"]),
@@ -196,9 +213,9 @@ def layout():
             html.H2("Leaderboard", style={
                 "margin": "0 0 8px 0", "color": COLORS["ink"],
                 "fontSize": "24px", "fontFamily": FONT_FAMILY}),
-            html.P("View top-performing entities across Advisor DNA dimensions. "
-                   "Click on a name to view their profile below — click a second "
-                   "name to compare.",
+            html.P("Top-performing entities across Advisor DNA dimensions. "
+                   "The #1 and last-ranked entities are compared below — click any "
+                   "name on the chart to swap a selection.",
                    style={"margin": "0", "color": COLORS["gray"],
                           "fontSize": "14px", "fontFamily": FONT_FAMILY}),
         ], style={"paddingBottom": "24px",
@@ -275,7 +292,7 @@ def layout():
 
         # Comparison panel — holds spider + table for up to 2 clicked entities
         html.Div(id="lb-compare-panel", children=[
-            html.P("Click on a name in the chart above to view their profile.",
+            html.P("Loading comparison...",
                    style={"color": COLORS["gray"], "fontSize": "13px",
                           "textAlign": "center", "padding": "16px"}),
         ], style={
@@ -285,6 +302,7 @@ def layout():
 
         # Hidden stores
         dcc.Store(id="lb-selected-ids", data=[]),
+        dcc.Store(id="lb-chart-entity-ids", data=[]),
     ], style={"padding": "20px", "fontFamily": FONT_FAMILY})
 
 
@@ -294,14 +312,17 @@ def layout():
 
 @callback(
     Output("lb-chart", "figure"),
+    Output("lb-chart-entity-ids", "data"),
+    Output("lb-selected-ids", "data", allow_duplicate=True),
     Input("lb-dimension-dropdown", "value"),
     Input("lb-method-dropdown", "value"),
     Input("lb-entity-type-dropdown", "value"),
     Input("lb-pool-dropdown", "value"),
     Input("lb-top-n-slider", "value"),
+    prevent_initial_call="initial_duplicate",
 )
 def update_leaderboard_chart(dimension, method, entity_type, pool, top_n):
-    """Fetch leaderboard data and render the bar chart."""
+    """Fetch leaderboard data, render bar chart, auto-select top & bottom."""
     min_peer_reviews = 20 if pool == "premier" else 0
     request_n = max(top_n, 25) if dimension == "composite" else top_n
 
@@ -336,12 +357,22 @@ def update_leaderboard_chart(dimension, method, entity_type, pool, top_n):
 
         composite_entries.sort(key=lambda x: x["score"], reverse=True)
         composite_entries = composite_entries[:top_n]
-        fig = _create_bar_chart(composite_entries, "composite", method)
+        chart_entries = composite_entries
     else:
-        dim_entries = data.get(dimension, []) if data else []
-        fig = _create_bar_chart(dim_entries, dimension, method)
+        chart_entries = data.get(dimension, []) if data else []
 
-    return fig
+    # Auto-select top and bottom entities
+    sorted_entries = sorted(chart_entries, key=lambda x: x.get("score", 0), reverse=True)
+    entity_ids = [e["advisor_id"] for e in sorted_entries if e.get("advisor_id")]
+    if len(entity_ids) >= 2:
+        auto_selected = [entity_ids[0], entity_ids[-1]]
+    elif len(entity_ids) == 1:
+        auto_selected = [entity_ids[0]]
+    else:
+        auto_selected = []
+
+    fig = _create_bar_chart(chart_entries, dimension, method, selected_ids=auto_selected)
+    return fig, entity_ids, auto_selected
 
 
 @callback(
@@ -379,6 +410,54 @@ def on_chart_click(click_data, current_ids):
 
 
 @callback(
+    Output("lb-chart", "figure", allow_duplicate=True),
+    Input("lb-selected-ids", "data"),
+    State("lb-chart", "figure"),
+    prevent_initial_call=True,
+)
+def restyle_bars_on_selection(selected_ids, fig):
+    """Highlight selected bars with comparison colors."""
+    if not fig or not fig.get("data"):
+        return no_update
+    selected_ids = selected_ids or []
+
+    trace = fig["data"][0]
+    customdata = trace.get("customdata", [])
+    entity_ids = [cd[0] if cd else "" for cd in customdata]
+
+    # Determine the base color (first non-selected bar's color, or navy fallback)
+    current_colors = trace.get("marker", {}).get("color", [])
+    if isinstance(current_colors, str):
+        base_color = current_colors
+    else:
+        # Find a bar that's not selected to get the base color
+        base_color = COLORS["navy"]
+        for i, eid in enumerate(entity_ids):
+            if eid not in selected_ids and i < len(current_colors):
+                base_color = current_colors[i]
+                break
+
+    new_colors = []
+    new_line_widths = []
+    new_line_colors = []
+    for eid in entity_ids:
+        if eid in selected_ids:
+            idx = selected_ids.index(eid)
+            new_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+            new_line_widths.append(2.5)
+            new_line_colors.append(COMPARE_COLORS[idx % len(COMPARE_COLORS)])
+        else:
+            new_colors.append(base_color)
+            new_line_widths.append(1)
+            new_line_colors.append(COLORS["navy"])
+
+    fig["data"][0]["marker"]["color"] = new_colors
+    fig["data"][0]["marker"]["line"]["color"] = new_line_colors
+    fig["data"][0]["marker"]["line"]["width"] = new_line_widths
+    return fig
+
+
+@callback(
     Output("lb-compare-panel", "children"),
     Input("lb-selected-ids", "data"),
     Input("lb-method-dropdown", "value"),
@@ -388,7 +467,7 @@ def update_compare_panel(selected_ids, method):
     selected_ids = selected_ids or []
     if not selected_ids:
         return [html.P(
-            "Click on a name in the chart above to view their profile.",
+            "Click on a name in the chart to view their profile.",
             style={"color": COLORS["gray"], "fontSize": "13px",
                    "textAlign": "center", "padding": "16px"})]
 
