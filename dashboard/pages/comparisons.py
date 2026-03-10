@@ -6,7 +6,7 @@ Provides interactive visualizations for:
 """
 
 import dash
-from dash import html, dcc, callback, Input, Output
+from dash import html, dcc, callback, Input, Output, State
 import plotly.graph_objects as go
 
 from dashboard.branding import COLORS, DATA_VIZ_PALETTE, FONT_FAMILY
