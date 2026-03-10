@@ -14,6 +14,14 @@ from dashboard.services.api import (
 
 dash.register_page(__name__, path="/advisor-dna", title="Advisor DNA")
 
+
+def _ordinal(n):
+    """Return ordinal string (e.g. 33 -> '33rd', 92 -> '92nd')."""
+    n = int(round(n))
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
+
 DIM_DESCRIPTIONS = {
     "trust_integrity": "Clients feel confident their advisor acts honestly and in their best interest.",
     "listening_personalization": "Advisors empathize with client needs and tailor plans to individual goals.",
@@ -176,12 +184,12 @@ def _build_entity_bars(dim_scores, review_count, title="Dimension Strength",
                              key=lambda d: pctile_scores.get(d, 50), reverse=True)
         values = [pctile_scores.get(d, 50) for d in dims_sorted]
         tiers = [_pctile_tier(v) for v in values]
-        text_labels = [f"{v:.0f}th — {t}" for v, t in zip(values, tiers)]
+        text_labels = [f"{_ordinal(v)} — {t}" for v, t in zip(values, tiers)]
         x_title = "Percentile Rank Among Peers"
         x_range = [0, 115]
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
-            f"Percentile: {pctile_scores.get(d, 50):.0f}th<br>"
+            f"Percentile: {_ordinal(pctile_scores.get(d, 50))}<br>"
             f"Tier: {_pctile_tier(pctile_scores.get(d, 50))}<br><br>"
             f"<i>{DIM_DESCRIPTIONS[d]}</i>"
             for d in dims_sorted
@@ -246,10 +254,10 @@ def _build_entity_spider(dim_scores, pctile_scores=None, breakpoints=None,
         radial_title = "Percentile"
         chart_title = title
         tier_fn = _pctile_tier
-        value_fmt = lambda v: f"{v:.0f}th"
+        value_fmt = lambda v: _ordinal(v)
         hovers = [
             f"<b>{DIM_LABELS[d]}</b><br>"
-            f"Percentile: {pctile_scores.get(d, 50):.0f}th<br>"
+            f"Percentile: {_ordinal(pctile_scores.get(d, 50))}<br>"
             f"Tier: {_pctile_tier(pctile_scores.get(d, 50))}"
             for d in DIMENSIONS
         ]
