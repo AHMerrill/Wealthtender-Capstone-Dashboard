@@ -9,6 +9,8 @@ Features:
 - Comparison table shows percentile, raw, and diff
 """
 
+import copy
+
 import dash
 from dash import html, dcc, callback, Input, Output, State, no_update
 import plotly.graph_objects as go
@@ -126,7 +128,7 @@ def _create_bar_chart(data, dimension, method, selected_ids=None):
         height=max(300, len(names) * 36 + 120),
         margin=dict(l=200, r=100, t=80, b=60),
         plot_bgcolor="white", paper_bgcolor="white",
-        hovermode="y unified", showlegend=False,
+        hovermode="closest", showlegend=False,
     )
     return fig
 
@@ -481,10 +483,12 @@ def restyle_bars_on_selection(selected_ids, fig, dimension):
             new_line_widths.append(0.5)
             new_line_colors.append(_hex_to_rgba(base_hex, _FADED_OPACITY))
 
-    fig["data"][0]["marker"]["color"] = new_colors
-    fig["data"][0]["marker"]["line"]["color"] = new_line_colors
-    fig["data"][0]["marker"]["line"]["width"] = new_line_widths
-    return fig
+    # Build a fresh copy so Dash detects the change
+    new_fig = copy.deepcopy(fig)
+    new_fig["data"][0]["marker"]["color"] = new_colors
+    new_fig["data"][0]["marker"]["line"]["color"] = new_line_colors
+    new_fig["data"][0]["marker"]["line"]["width"] = new_line_widths
+    return new_fig
 
 
 @callback(

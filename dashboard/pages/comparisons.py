@@ -428,13 +428,6 @@ def update_entity_dropdowns(entity_type):
     return options, options
 
 
-@callback(
-    Output("entity-spider-chart", "figure"),
-    Output("entity-comparison-table", "children"),
-    Input("entity-a-dropdown", "value"),
-    Input("entity-b-dropdown", "value"),
-    Input("entity-method-dropdown", "value"),
-)
 def _extract_score(dim_data, key="raw"):
     """Extract a score from enriched (dict) or legacy (float) format."""
     if isinstance(dim_data, dict):
@@ -450,6 +443,13 @@ def _ordinal(n):
     return f"{n}{['th','st','nd','rd'][min(n % 10, 4) if n % 10 < 4 else 0]}"
 
 
+@callback(
+    Output("entity-spider-chart", "figure"),
+    Output("entity-comparison-table", "children"),
+    Input("entity-a-dropdown", "value"),
+    Input("entity-b-dropdown", "value"),
+    Input("entity-method-dropdown", "value"),
+)
 def update_entity_comparison(entity_a_id, entity_b_id, method):
     """Update entity comparison chart and table with percentile display."""
     if not entity_a_id or not entity_b_id:

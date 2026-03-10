@@ -1,3 +1,4 @@
+import html as _html
 import json
 import logging
 import re
@@ -161,17 +162,24 @@ class ArtifactStore:
 
         try:
             if file_type == "csv":
-                return pd.read_csv(path, encoding="utf-8")
-            if file_type == "json":
-                return pd.DataFrame(json.loads(path.read_text(encoding="utf-8")))
-            if file_type == "parquet":
-                return pd.read_parquet(path)
+                df = pd.read_csv(path, encoding="utf-8")
+            elif file_type == "json":
+                df = pd.DataFrame(json.loads(path.read_text(encoding="utf-8")))
+            elif file_type == "parquet":
+                df = pd.read_parquet(path)
+            else:
+                log.warning("Unknown file type '%s' for artifact '%s'", file_type, name)
+                return pd.DataFrame()
+
+            # Unescape HTML entities (e.g. &amp; -> &) in string columns
+            for col in df.select_dtypes(include="object").columns:
+                df[col] = df[col].map(
+                    lambda v: _html.unescape(v) if isinstance(v, str) else v
+                )
+            return df
         except Exception as exc:
             log.error("Failed to load artifact '%s' from %s: %s", name, path, exc)
             return pd.DataFrame()
-
-        log.warning("Unknown file type '%s' for artifact '%s'", file_type, name)
-        return pd.DataFrame()
 
     def _load_json(self, name: str) -> dict:
         item = self._get_manifest_item(name)
