@@ -283,24 +283,27 @@ Cosine similarity measures **semantic overlap** between a review's language and 
 
 These are inherent limitations of embedding-based cosine similarity — not bugs. The approach works best when reviews are detailed enough to contain dimension-specific language. For a more robust alternative, see the next section.
 
-### Alternative: LLM-Based Scoring Pipeline
+### Alternative: LLM-Enhanced Scoring Pipelines
 
-A large language model (LLM) can address the limitations above by *reading and reasoning about* each review rather than measuring surface-level semantic overlap. Here is an outline of how such a pipeline would work:
+A large language model (LLM) can address the cosine similarity limitations above by *reading and reasoning about* each review. Below are three approaches, ordered from easiest to most robust. All use a lightweight model like GPT-4o-mini or Claude Haiku. The six DNA dimensions remain the same — what changes is how reviews are scored against them.
 
-**Step 1: Structured Review Analysis**
-For each review, prompt an LLM (e.g., GPT-4, Claude) with the review text and the six dimension definitions. Ask it to return a structured JSON response identifying which dimensions are discussed (explicitly or implicitly), a 1-5 score per dimension, and a brief justification for each score. Reviews that don't mention a dimension get a null rather than a low score — this distinguishes "not discussed" from "discussed negatively."
+**Option A: LLM-Expanded Embeddings (Easiest)**
+Before embedding reviews, run each one through an LLM with a prompt like: "Expand this review into explicit statements about each of our 6 DNA dimensions." A short review like "they were patient and listened" becomes structured sentences about trust, communication, empathy, etc. Then embed *that* expanded text instead of the raw review. The entire downstream pipeline stays exactly the same — cosine similarity, percentiles, tiers, all of it. Zero changes to the dashboard or API. The big win is that short or vague reviews now produce meaningful scores because the LLM fills in implicit meaning before the embedding step runs.
 
-**Step 2: Confidence-Weighted Aggregation**
-At the entity level, aggregate dimension scores across all reviews using only reviews where that dimension was identified as present. This avoids the current problem where short positive reviews drag down an entity's score by contributing near-zero similarity on dimensions that simply weren't mentioned. Weight by review length, recency, or LLM confidence as appropriate.
+**Option B: Score Blending (Most Robust)**
+Run both pipelines independently. The current embedding pipeline produces cosine similarity scores per dimension. A separate LLM pass reads each review, rates it 0–100 on each dimension with a confidence score, and returns structured JSON. Normalize both score sets to the same 0–100 scale, then blend them — e.g., 40% embedding + 60% LLM, weighted by the LLM's confidence. Aggregate to advisor level the same as now. The embedding catches semantic similarity the LLM might miss; the LLM catches context and meaning that embeddings miss. They cover each other's blind spots. Blend weights can be calibrated against a small set of human-labeled reviews for validation.
 
-**Step 3: Calibration**
-Use a sample of human-labeled reviews to calibrate the LLM's scores. Measure agreement between human raters and the model, adjusting the prompt or scoring rubric until inter-rater reliability is acceptable. This step is critical for stakeholder trust.
+**Option C: LLM as Confidence Filter (Most Targeted)**
+Keep embedding scores as the primary method. Use the LLM only to flag reviews where the embedding is likely wrong — short reviews, ambiguous language, or reviews near tier boundaries. For flagged reviews, substitute the LLM's score; everything else keeps the fast embedding score. This minimizes LLM cost while fixing the most problematic cases. The tradeoff is defining "likely wrong" without ground truth labels.
 
-**Step 4: Hybrid Approach (Optional)**
-Combine embedding-based scores (fast, cheap, deterministic) with LLM-based scores (slower, costlier, more accurate) by using embeddings as a first pass and LLM analysis for reviews that score ambiguously or for entities near tier boundaries.
+**Shared Steps (All Options):**
+- **Confidence-Weighted Aggregation:** At the entity level, weight review contributions by LLM confidence (or review length as a proxy) so detailed reviews count more than one-liners.
+- **Calibration:** Use a sample of ~50-100 human-labeled reviews to tune LLM prompts, blend weights, or flagging thresholds. Measure agreement between human raters and the model. This step is critical for stakeholder trust.
 
-**Cost and Latency Considerations:**
-LLM scoring is significantly more expensive than cosine similarity (~$0.01-0.05 per review vs. effectively free). For Wealthtender's current corpus (~4,200 reviews), a full LLM scoring run would cost roughly $40-200 depending on the model and prompt length. This is a one-time batch cost, not per-request — scored results would be stored in a database and served by the same API layer. Incremental scoring of new reviews as they arrive would cost fractions of a cent each.
+**Cost Estimates (GPT-4o-mini):**
+LLM scoring is a one-time batch cost, not per-request — scored results are stored and served by the same API layer. GPT-4o-mini pricing is ~$0.15/M input tokens and ~$0.60/M output tokens. Per review: ~600 input tokens (review + prompt + dimension definitions) and ~150 output tokens (structured JSON response). For the current corpus (~4,200 reviews), a full scoring run costs roughly **$1–5 total**. Incremental scoring of new reviews as they arrive costs fractions of a cent each.
+
+**Recommended Path:** Implement Option A first (a weekend of work, biggest bang for buck), then layer on Option B if time allows. The progression from pure embeddings → LLM-expanded embeddings → hybrid blending tells a strong analytical story.
 
 ---
 
