@@ -17,10 +17,12 @@ build/
 # Secrets / local-only
 wt_dash_secrets.txt
 
-# Non-project dirs
+# Non-project dirs (kept locally, not part of the codebase)
 eda/
 project_definition_guide/
 Brandbook/
+docs/
+PROJECT_LOG.md
 
 # Large notebook data files (keep .ipynb notebooks)
 notebooks/collaborator/*.csv

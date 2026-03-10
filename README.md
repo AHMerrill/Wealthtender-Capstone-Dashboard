@@ -117,7 +117,6 @@ assets/                       Static files served by Dash
   theme.css                   Auto-generated CSS (written by branding.py at startup)
   favicon.png
 
-Brandbook/                    Brand guidelines and color extraction tools
 data_contract/                Schema expectations for artifacts
 notebooks/collaborator/       Scoring notebook (generates scoring artifacts)
 
@@ -449,7 +448,6 @@ When Wealthtender's engineering team replaces the prototype auth:
 | Live API | [wt-api-hdji.onrender.com/api/health](https://wt-api-hdji.onrender.com/api/health) |
 | GitHub Repo | [github.com/AHMerrill/Wealthtender-Capstone-Dashboard](https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard) |
 | Render Dashboard | [dashboard.render.com](https://dashboard.render.com) |
-| Project Log | [PROJECT_LOG.md](./PROJECT_LOG.md) |
 | Changelog | [CHANGELOG.md](./CHANGELOG.md) |
 | Data Contract | [data_contract/README.md](./data_contract/README.md) |
 | License | [LICENSE](./LICENSE) (Apache 2.0) |
