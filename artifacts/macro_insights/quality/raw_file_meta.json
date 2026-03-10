@@ -1,5 +1,5 @@
 {
-  "raw_csv": "/content/drive/MyDrive/Capstone_Wealthtender/data/raw/reviews_20260202.csv",
+  "raw_csv": "wealthtender_reviews.csv",
   "sha256": "dcb841466059464f6545b644bd592407bae3d7d8ed178505dbbbd069ec80a23f",
   "bytes": 3784833
 }

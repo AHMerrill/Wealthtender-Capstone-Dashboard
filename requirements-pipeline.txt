@@ -1,0 +1,12 @@
+# ── Data Pipeline (python -m pipeline.run) ───────────────────────────
+# Only needed when regenerating artifacts from raw reviews.
+# NOT needed at runtime by the API or dashboard.
+#
+# Install:  pip install -r requirements-pipeline.txt
+# ─────────────────────────────────────────────────────────────────────
+-r requirements.txt
+sentence-transformers>=2.2.0
+nltk>=3.8
+numpy>=1.24
+pyarrow>=14.0
+torch>=2.0

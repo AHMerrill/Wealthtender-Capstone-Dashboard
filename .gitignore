@@ -28,3 +28,12 @@ PROJECT_LOG.md
 notebooks/collaborator/*.csv
 notebooks/collaborator/*.parquet
 notebooks/.DS_Store
+
+# Pipeline intermediate files (large, regenerable)
+data/intermediate/
+
+# Raw data (sensitive, not committed — provide your own CSV)
+data/raw/*.csv
+
+# R artifacts
+.Rhistory

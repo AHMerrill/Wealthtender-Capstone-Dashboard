@@ -1,10 +1,10 @@
 {
-  "n_rows": 4822,
+  "n_rows": 4774,
   "n_cols": 20,
-  "n_advisors": 339,
-  "n_names": 364,
+  "n_advisors": 334,
+  "n_names": 357,
   "date_min": "2008-11-24 18:00:00",
   "date_max": "2026-01-07 15:15:00",
-  "rating_missing_frac": 0.013894649523019494,
-  "text_empty_frac": 0.00041476565740356696
+  "rating_missing_frac": 0.010054461667364893,
+  "text_empty_frac": 0.00020946795140343527
 }

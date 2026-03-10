@@ -23,95 +23,191 @@ SECTIONS = [
                 "across six dimensions of advisor quality."
             ),
             html.P(
-                "The system is built as two independent services: a FastAPI backend that "
-                "processes and serves pre-computed analytical artifacts, and a Plotly Dash "
-                "frontend that renders interactive visualizations and drill-down interfaces. "
-                "Both services are containerized and deployed on Render, communicating over "
-                "authenticated REST endpoints."
-            ),
-            html.P(
-                "The analytical pipeline operates in three phases. First, an EDA and embedding "
-                "notebook (NLP_I.ipynb) cleans the raw review data, performs lexical analysis, "
-                "and generates sentence-transformer embeddings for all reviews. Second, a scoring "
-                "notebook (query_embeddings_vs_review_embeddings.ipynb) computes cosine similarity "
-                "between review embeddings and six dimension query strings, then aggregates scores "
-                "to the entity level. Third, the dashboard consumes those pre-built artifacts at "
-                "runtime, computing percentiles, tier labels, and aggregate statistics on the fly "
-                "without re-running any NLP models."
+                "The analytical pipeline is packaged as a standalone Python module (pipeline/) "
+                "that reads a single raw CSV export from the Wealthtender platform and produces "
+                "all CSV and JSON artifacts the API needs. No model inference happens at runtime "
+                "— all NLP processing runs offline. The sections below detail each stage of this "
+                "process, including a step-by-step trace of a single review through the entire pipe."
             ),
         ],
     },
     {
         "id": "pipeline",
-        "title": "Analysis Pipeline & Source Files",
+        "title": "Analysis Pipeline",
         "content": [
             html.P(
-                "The full analysis pipeline runs across three Jupyter notebooks in sequence, "
-                "producing static CSV and JSON artifacts that the API loads at startup. "
-                "No model inference happens at runtime — all NLP processing is offline."
+                "The full analysis pipeline is packaged as a Python module (pipeline/) with "
+                "four stages that run in sequence. All code was extracted from the team's "
+                "Jupyter notebooks and can be executed with a single command: "
+                "python -m pipeline.run. The original notebooks remain in the repository "
+                "for reference but are no longer needed to regenerate artifacts."
             ),
-            html.H4("Step 1: Data Cleaning & EDA",
+            html.H4("Stage 1: Clean (pipeline/clean.py)",
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
-            html.P([
-                html.B("Notebook: "),
-                "notebooks/NLP_I.ipynb (Sections 1.1–1.6)"
-            ]),
             html.P(
-                "Raw Wealthtender review exports are cleaned (date filtering, deduplication, "
-                "whitespace normalization, HTML entity unescaping), tokenized, and analyzed. "
-                "This step produces the cleaned review dataset (reviews_clean.csv), word count "
-                "distributions, n-gram frequency tables (unigrams, bigrams, trigrams), and "
-                "data quality/coverage reports. These outputs are stored in artifacts/macro_insights/ "
-                "and power the EDA page of the dashboard."
+                "Reads the raw Wealthtender CSV (data/raw/wealthtender_reviews.csv), "
+                "standardizes column names, creates a canonical advisor_id from the profile URL, "
+                "and filters out known test/demo accounts. Then runs ten text normalization steps: "
+                "unicode normalization, line break flattening, URL and email removal, bullet/glyph "
+                "removal, boilerplate disclaimer stripping, whitespace normalization, punctuation "
+                "de-duplication, letter stretching collapse, and lowercasing. Drops reviews under "
+                "5 characters. Outputs reviews_clean.csv and supporting EDA, quality, and lexical "
+                "artifacts to artifacts/macro_insights/."
             ),
-            html.H4("Step 2: Embedding Generation",
+            html.H4("Stage 2: Embed (pipeline/embed.py)",
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
-            html.P([
-                html.B("Notebook: "),
-                "notebooks/NLP_I.ipynb (Section 2: Semantic Relationship Discovery)"
-            ]),
             html.P(
-                "Each cleaned review is encoded into a 384-dimensional vector using the "
-                "all-MiniLM-L6-v2 sentence-transformer model. Reviews are encoded in batches, "
-                "with advisor names removed from the text before encoding to prevent name-based "
-                "bias. Both review-level and advisor-level embeddings are exported as Parquet "
-                "files for efficient reuse by downstream scoring notebooks."
+                "Loads reviews_clean.csv, filters to reviews after 2014, and computes a review hash "
+                "(SHA256 of advisor_id, review_text_raw, review_date, and reviewer_name) for each row. "
+                "In incremental mode (the default), it compares these hashes against existing embeddings "
+                "and only encodes new reviews, appending them to the accumulated file. "
+                "Tokenizes the cleaned text and removes NLTK English stopwords plus domain-specific "
+                "terms. Strips platform prompt fragments and HTML entities, then removes the "
+                "advisor's name from each review so embeddings capture what was said, not who it was "
+                "about. Encodes the processed text with the all-MiniLM-L6-v2 sentence-transformer "
+                "into 384-dimensional unit vectors. Aggregates the full accumulated set to advisor level "
+                "via L2-normalized mean and a penalized variant (mean scaled by a staleness decay factor). "
+                "Exports df_embeddings_MVP.csv and advisor parquets to data/intermediate/."
             ),
-            html.H4("Step 3: Dimension Scoring",
+            html.H4("Stage 2b: Weighted-by-Time Embeddings (pipeline/embed.py)",
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
-            html.P([
-                html.B("Notebook: "),
-                "notebooks/collaborator/query_embeddings_vs_review_embeddings.ipynb"
-            ]),
             html.P(
-                "Six carefully crafted dimension query strings are encoded into the same "
-                "embedding space. Cosine similarity is computed between every review embedding "
-                "and each of the six query embeddings, producing a score matrix. Scores are "
-                "then aggregated to the entity level using three methods (mean, penalized, "
-                "weighted). The outputs — review_dimension_scores.csv and "
-                "advisor_dimension_scores.csv — are stored in artifacts/scoring/ and serve as "
-                "the foundation for all dashboard visualizations."
+                "A separate embedding pass runs with different settings from a collaborator's notebook. "
+                "It loads reviews_clean.csv but applies only a simple full-name replacement for advisor "
+                "name removal (no per-token stripping). Encodes with normalize_embeddings=False, producing "
+                "unnormalized vectors. For each advisor, computes a time-weighted mean embedding using "
+                "half-life decay: recent reviews count more (weight = 0.5 raised to age_years/2.0). "
+                "The weighted aggregation is intentionally not L2-normalized. Outputs "
+                "df_advisors_weighted_time.parquet to data/intermediate/."
             ),
-            html.H4("Step 4: Runtime Enrichment",
+            html.H4("Stage 3: Score (pipeline/score.py)",
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
-            html.P([
-                html.B("Source: "),
-                "api/services/artifacts.py"
-            ]),
+            html.P(
+                "Loads review embeddings, parses each embedding string back to a numpy array, and "
+                "stacks them into a matrix E_r. Encodes the six dimension query strings with the same "
+                "model into a 6\u00d7384 matrix E_q. Computes cosine similarity via the dot product "
+                "S = E_r @ E_q\u1d40, producing a score for every (review, dimension) pair. At the "
+                "advisor level, mean and penalized embedding matrices are dotted against E_q to "
+                "produce entity-level scores. Exports review_dimension_scores.csv and "
+                "advisor_dimension_scores.csv to artifacts/scoring/."
+            ),
+            html.H4("Side-step: Enrich Comparisons (pipeline/enrich_comparisons.py)",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "Generates partner-group associations for the Comparisons tab. This is temporary "
+                "development scaffolding that can be deleted with zero impact on the main pipeline. "
+                "It auto-detects whether the raw data includes a partner_group column: if yes, it "
+                "writes real associations; if no, it generates mock firm-advisor groupings for demo "
+                "purposes. This file will be removed once real partner group data arrives in the "
+                "Wealthtender export."
+            ),
+            html.H4("Runtime: API Enrichment (api/services/artifacts.py)",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "At startup, the FastAPI backend loads all CSV and JSON artifacts into memory. "
                 "When a request arrives, it computes percentile ranks (via pandas rank), "
-                "min-max normalized scores, and tier labels on the fly — no NLP models are "
+                "min-max normalized scores, and tier labels on the fly \u2014 no NLP models are "
                 "invoked. The dashboard then renders these enriched scores as interactive "
                 "charts, leaderboards, and comparison views."
             ),
-            html.H4("Additional Notebooks",
-                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+        ],
+    },
+    {
+        "id": "water-droplet",
+        "title": "Following a Review Through the Pipe",
+        "content": [
+            html.P(
+                "To make the pipeline concrete, here is what happens to a single review as it "
+                "flows through every stage from raw CSV row to dashboard visualization."
+            ),
             html.P([
-                html.B("notebooks/Scoring_Exploration.ipynb"),
-                " — Experimental notebook exploring alternative scoring approaches "
-                "(KMeans clustering, cosine similarity experiments). Not part of the "
-                "production pipeline but preserved for reference."
+                html.B("The raw review: "),
+                "A client submits a 5-star review for advisor Omar A. Morillo. The review "
+                "text describes trust, honesty, personalized advice, and financial expertise. "
+                "This arrives in data/raw/wealthtender_reviews.csv as one row with 15 columns."
+            ]),
+            html.H4("Stage 1: clean.py",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The pipeline reads the CSV. It creates advisor_id from the notification_page URL "
+                "(e.g., https://wealthtender.com/financial-advisors/omar-a-morillo-cfp-chfc-aif/). "
+                "It checks this ID against the test-account exclusion list \u2014 this is a real "
+                "advisor, so the review passes. The raw text is copied to review_text_clean and "
+                "run through ten normalization steps: unicode is standardized, line breaks become "
+                "spaces, URLs and emails are removed, bullet glyphs are stripped, the boilerplate "
+                "disclaimer ('This reviewer received no compensation...') is removed, whitespace "
+                "is collapsed, exaggerated punctuation is normalized, and the text is lowercased. "
+                "Token counts are computed. The review survives the 5-character minimum and is "
+                "written to reviews_clean.csv as one of roughly 4,700 clean rows."
+            ),
+            html.H4("Stage 2: embed.py",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The cleaned review is loaded, filtered (post-2014, no duplicates), and tokenized. "
+                "Stopwords are removed (NLTK English + domain terms like 'advisor' and 'financial'). "
+                "Platform prompt fragments ('things you value in your advisor...') are stripped. "
+                "The advisor's name \u2014 'omar,' 'morillo,' and the full name phrase \u2014 is "
+                "removed from the text so the embedding captures what the client said, not who "
+                "they said it about. The processed text is fed to the all-MiniLM-L6-v2 model, "
+                "which produces a 384-dimensional unit vector. This is the review's embedding. "
+                "It also contributes to Omar's advisor-level mean embedding (the L2-normalized "
+                "centroid of all his review vectors) and his penalized embedding (the mean scaled "
+                "by an exponential staleness decay factor). A separate Stage 2b pass re-encodes all "
+                "reviews with normalize_embeddings=False and aggregates to advisor level using "
+                "half-life time-decay weights (recent reviews count more). This produces the "
+                "weighted-by-time advisor embeddings."
+            ),
+            html.H4("Stage 3: score.py",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "The review's 384-dim embedding is stacked with all other review embeddings into a "
+                "matrix E_r. The six dimension query strings are encoded into a 6\u00d7384 matrix "
+                "E_q. The dot product S = E_r @ E_q\u1d40 gives a cosine similarity for every "
+                "(review, dimension) pair. Our review scores highest on Trust & Integrity (the text "
+                "mentions 'honest,' 'trustworthy,' 'secure') and Listening & Personalization ('takes "
+                "the time to truly listen,' 'tailoring advice'). These six scores are written to "
+                "review_dimension_scores.csv. Omar's advisor-level scores (mean, penalized, weighted) "
+                "are written to advisor_dimension_scores.csv."
+            ),
+            html.H4("Runtime: API \u2192 Dashboard",
+                     style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.P(
+                "When the FastAPI server starts, it loads both scoring CSVs into memory. A dashboard "
+                "user navigates to Advisor DNA and selects Omar Morillo. The API looks up his "
+                "advisor_id, retrieves his six dimension scores, computes percentile ranks within "
+                "the advisor peer group, min-max normalizes to 0\u2013100, and assigns tier labels "
+                "(e.g., 'Very Strong' if \u226575th percentile). The dashboard renders this as bar "
+                "charts, spider charts, and tier badges \u2014 all derived from that original raw "
+                "review row in the CSV."
+            ),
+        ],
+    },
+    {
+        "id": "data-storage",
+        "title": "Data Storage & Migration",
+        "content": [
+            html.P([
+                html.B("Current setup (flat files, local): "),
+                "The pipeline reads from data/raw/wealthtender_reviews.csv and writes all outputs "
+                "to artifacts/ (final CSV/JSON files) and data/intermediate/ (large working files "
+                "like embeddings). The API loads from artifacts/ at startup. Everything is local "
+                "filesystem \u2014 no database involved."
+            ]),
+            html.P([
+                html.B("To update data: "),
+                "Place a new Wealthtender export in data/raw/, then run "
+                "python -m pipeline.run. Stage 2 automatically detects which reviews are new and only "
+                "encodes those, appending to the existing embeddings. Stages 3 and 4 re-score the full "
+                "accumulated dataset and update the artifacts."
+            ]),
+            html.P([
+                html.B("To migrate to a database: "),
+                "(1) Swap the pd.read_csv call in clean.py with pd.read_sql \u2014 everything "
+                "downstream receives a DataFrame so no other pipeline code changes. "
+                "(2) After each stage, write artifacts to database tables instead of CSVs. "
+                "(3) In api/services/artifacts.py, replace CSV reads with database queries. "
+                "The API endpoints, request parameters, and JSON response shapes all stay identical, "
+                "so the dashboard requires zero changes. The API is deliberately storage-agnostic."
             ]),
         ],
     },
@@ -126,19 +222,19 @@ SECTIONS = [
                 "and cover both individual financial advisors and advisory firms."
             ),
             html.P(
-                "The current dataset contains 4,579 reviews across 334 entities (288 individual "
-                "advisors and 46 firms). Review counts per entity range from 1 to 135, with a "
-                "median of 9 and a mean of approximately 13.7. This skewed distribution is a key "
-                "consideration for statistical confidence, motivating the confidence tier system "
-                "described later."
+                "After cleaning (including removal of known test/demo accounts), the dataset contains "
+                "approximately 4,700 reviews across ~330 entities (individual advisors and firms). "
+                "Review counts per entity range from 1 to 135, with a skewed distribution that "
+                "motivates the confidence tier system described later."
             ),
             html.H4("Data Cleaning", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Raw reviews undergo a cleaning pipeline that normalizes whitespace, strips HTML "
-                "entities, and standardizes encoding. A cleaned token count is computed for each "
-                "review using a simple tokenizer that lowercases text, removes non-alphanumeric "
-                "characters (preserving apostrophes), collapses whitespace, and drops single-character "
-                "tokens. These cleaned token counts power the EDA word count distributions and filters."
+                "Raw reviews are cleaned by pipeline/clean.py (see the Analysis Pipeline section "
+                "above). Known test and demo advisor accounts are filtered out using an explicit "
+                "exclusion list in pipeline/config.py. A cleaned token count is computed for each "
+                "review using a tokenizer that lowercases text, removes non-alphanumeric characters "
+                "(preserving apostrophes), collapses whitespace, and drops single-character tokens. "
+                "These counts power the EDA word count distributions."
             ),
         ],
     },
@@ -202,33 +298,24 @@ SECTIONS = [
             ),
             html.H4("Embedding Model", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Review texts and query strings are encoded using the "
-                "all-MiniLM-L6-v2 model from the sentence-transformers library. "
-                "This model maps variable-length text inputs to 384-dimensional dense vectors "
-                "in a shared semantic space. This encoding is performed offline in a Jupyter notebook "
-                "and the resulting embeddings are stored as Parquet files for efficient reuse."
-            ),
-            html.H4("Review Embeddings", style={"marginTop": "16px", "color": COLORS["navy"]}),
-            html.P(
-                "Each review in the corpus is encoded once into a single embedding vector. These "
-                "vectors are pre-computed and stored, eliminating the need to run the transformer "
-                "model at dashboard runtime. The embedding captures the full semantic content "
-                "of the review text."
+                "All text is encoded using the all-MiniLM-L6-v2 model from the "
+                "sentence-transformers library, which maps variable-length inputs to "
+                "384-dimensional dense vectors in a shared semantic space. Encoding is "
+                "performed offline (see Pipeline Steps 2–3) and the resulting embeddings "
+                "are stored as Parquet files — no transformer inference happens at runtime."
             ),
             html.H4("Dimension Query Strings", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "Six carefully crafted query strings define the quality dimensions. Each query is "
-                "a detailed paragraph (approximately 60-80 words) that describes the ideal client "
-                "experience for that dimension. These queries were developed through a combination "
-                "of subject matter expertise, analysis of real client reviews, and iterative "
-                "refinement with large language models (LLMs). They are designed to capture nuanced "
-                "aspects of advisor quality that go beyond simple keyword matching."
+                "a detailed paragraph (approximately 60–80 words) describing the ideal client "
+                "experience for that dimension. These queries were developed through subject matter "
+                "expertise, analysis of real client reviews, and iterative refinement with large "
+                "language models (LLMs). They capture nuanced aspects of advisor quality that go "
+                "beyond simple keyword matching."
             ),
             html.P(
                 "The six dimensions are: Trust & Integrity, Customer Empathy & Personalization, "
-                "Communication Clarity, Responsiveness, Life Event Support, and Investment Expertise. "
-                "Each query string is encoded into the same embedding space as the reviews, enabling "
-                "direct cosine similarity comparison."
+                "Communication Clarity, Responsiveness, Life Event Support, and Investment Expertise."
             ),
         ],
     },
@@ -292,9 +379,9 @@ SECTIONS = [
             html.H4("Entity Types", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "Aggregation is performed separately for individual advisors and firms. Firm-level "
-                "scores are computed from all reviews associated with that firm entity. The current "
-                "dataset contains 288 advisors and 46 firms. Tier labels and percentile ranks are "
-                "computed within each entity type to ensure fair peer-group comparisons."
+                "scores are computed from all reviews associated with that firm entity. Tier labels "
+                "and percentile ranks are computed within each entity type to ensure fair "
+                "peer-group comparisons."
             ),
         ],
     },
@@ -317,11 +404,10 @@ SECTIONS = [
             ),
             html.H4("Peer Group Composition", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "By default, the peer group includes all entities of the same type (all 288 advisors "
-                "or all 46 firms). The premier pool option restricts the peer group to entities with "
-                "20 or more reviews, creating a higher-bar comparison against well-reviewed peers. "
-                "The target entity is always included in its own percentile calculation regardless "
-                "of review count."
+                "By default, the peer group includes all entities of the same type. The premier "
+                "pool option restricts comparisons to entities with 20+ reviews (see Confidence "
+                "Tiers & Premier Pool). The target entity is always included in its own percentile "
+                "calculation regardless of review count."
             ),
             html.H4("Method-Specific Breakpoints", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
@@ -349,38 +435,36 @@ SECTIONS = [
                 "Leaderboard defaults to composite ranking, providing a single overall measure "
                 "of advisor performance."
             ),
-            html.H4("Known Limitations of Cosine Similarity Scoring",
-                     style={"marginTop": "20px", "color": COLORS["navy"]}),
+        ],
+    },
+    {
+        "id": "limitations",
+        "title": "Known Limitations & Future Improvements",
+        "content": [
             html.P(
                 "Cosine similarity measures semantic overlap between a review's language "
-                "and each dimension's query text. This means scores reflect how strongly "
-                "the review's wording aligns with the dimension definition — not whether "
-                "the review is positive or negative overall. A glowing five-star review "
-                "that simply says 'Great advisor, highly recommend!' will score low across "
-                "all dimensions because the language is too general to match any specific "
-                "dimension definition."
+                "and each dimension's query text. Scores reflect how strongly the review's "
+                "wording aligns with the dimension definition — not whether the review is "
+                "positive or negative. A glowing five-star review that simply says "
+                "'Great advisor, highly recommend!' will score low across all dimensions "
+                "because the language is too general to match any specific definition."
             ),
             html.P(
                 "Short reviews are disproportionately affected. A two-sentence review "
-                "like 'She is patient and understanding' clearly implies empathy and trust "
-                "to a human reader, but produces weak cosine similarity because there are "
-                "not enough tokens to create meaningful semantic overlap with the detailed "
-                "dimension query strings."
-            ),
-            html.P(
-                "This also means an entity with many short, positive reviews may rank "
-                "lower than one with fewer but longer, more descriptive reviews. The model "
-                "rewards specificity and detail, not just positive sentiment."
+                "like 'She is patient and understanding' produces weak cosine similarity "
+                "because there are not enough tokens to create meaningful overlap with the "
+                "detailed dimension query strings. This means entities with many short, "
+                "positive reviews may rank lower than those with fewer but longer, more "
+                "descriptive reviews. The model rewards specificity and detail, not just "
+                "positive sentiment."
             ),
             html.P([
                 html.B("Future improvement: "),
                 "An LLM-based pipeline could address these limitations by having a large "
                 "language model read each review, identify which dimensions are discussed "
                 "(even implicitly), and assign structured scores with reasoning. This would "
-                "capture implied meaning that cosine similarity misses — for example, "
-                "recognizing that 'patient and understanding' implies strong empathy even "
-                "without using empathy-specific vocabulary. See the README for an outline "
-                "of this alternative pipeline."
+                "capture implied meaning that cosine similarity misses. See the README for "
+                "an outline of this alternative pipeline."
             ]),
         ],
     },
@@ -392,19 +476,6 @@ SECTIONS = [
                 "Four performance tiers translate percentile ranks into plain-language labels that "
                 "advisors and firms can immediately understand."
             ),
-            html.Div(
-                style={"margin": "16px 0", "display": "flex", "flexDirection": "column", "gap": "8px"},
-                children=[
-                    _tier_card("Very Strong", "75th percentile and above",
-                               "Top-quartile performance. This entity excels in this dimension relative to peers."),
-                    _tier_card("Strong", "50th to 75th percentile",
-                               "Above-median performance. Consistently positive client sentiment in this area."),
-                    _tier_card("Moderate", "25th to 50th percentile",
-                               "Below-median but not critically low. Room for targeted improvement."),
-                    _tier_card("Foundational", "Below 25th percentile",
-                               "Lowest quartile. This dimension may benefit from focused attention and strategy."),
-                ],
-            ) if False else html.Div(),  # placeholder to avoid forward ref — built inline below
             html.Table(
                 style={"width": "100%", "borderCollapse": "collapse", "marginTop": "16px", "fontSize": "14px"},
                 children=[
@@ -637,12 +708,9 @@ SECTIONS = [
             ),
             html.H4("Artifact Pipeline", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Scoring artifacts are generated offline by a Jupyter notebook that: (1) loads "
-                "pre-computed review embeddings from Parquet files, (2) encodes the six dimension "
-                "query strings using sentence-transformers, (3) computes cosine similarity between "
-                "each review and each query, (4) aggregates to entity level using mean, penalized, "
-                "and weighted methods, and (5) exports two CSV files. A metadata.json manifest "
-                "tells the API where to find each artifact file."
+                "Scoring artifacts are generated offline by the notebook pipeline described in "
+                "Analysis Pipeline & Source Files. A metadata.json manifest tells the API where "
+                "to find each artifact file."
             ),
         ],
     },
@@ -717,15 +785,14 @@ SECTIONS = [
         "content": [
             html.P(
                 "Both services are containerized using Docker and deployed on Render as separate "
-                "web services. A render.yaml blueprint defines the deployment configuration."
+                "web services, configured via a render.yaml blueprint."
             ),
             html.H4("Docker Containers", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Each service has its own Dockerfile. The API uses Uvicorn as its ASGI server; "
-                "the dashboard uses Gunicorn as its WSGI server. Multi-stage builds keep images "
-                "lean by separating dependency installation from runtime. Artifacts are baked "
-                "into the container image, so the API loads data from the filesystem at startup "
-                "with no external database dependency."
+                "Each service has its own Dockerfile. The API uses Uvicorn (ASGI); the dashboard "
+                "uses Gunicorn (WSGI). Multi-stage builds keep images lean. Artifacts are baked "
+                "into the API image, so it loads data from the filesystem at startup with no "
+                "external database dependency."
             ),
             html.H4("Environment Configuration", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
@@ -768,11 +835,6 @@ SECTIONS = [
         ],
     },
 ]
-
-
-def _tier_card(label, range_text, description):
-    """Helper — not used in final layout, kept for reference."""
-    return html.Div()
 
 
 # ---------------------------------------------------------------------------
