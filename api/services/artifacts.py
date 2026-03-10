@@ -373,7 +373,15 @@ class ArtifactStore:
         self.review_dim_scores = scores
 
     def _enrich_advisor_review_counts(self):
-        """Add review_count column to advisor_dim_scores from review-level data."""
+        """Add review_count column to advisor_dim_scores from review-level data.
+
+        If the pipeline already baked review_count into the CSV (score.py),
+        this is a no-op.  Otherwise it computes counts from review-level data.
+        """
+        if "review_count" in self.advisor_dim_scores.columns:
+            self.advisor_dim_scores["review_count"] = (
+                self.advisor_dim_scores["review_count"].fillna(0).astype(int))
+            return
         if self.advisor_dim_scores.empty or self.review_dim_scores.empty:
             return
         counts = self.review_dim_scores.groupby("advisor_id").size().rename("review_count")
