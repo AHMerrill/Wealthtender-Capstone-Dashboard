@@ -31,13 +31,15 @@ https://github.com/AHMerrill/Wealthtender-Capstone-Dashboard/archive/refs/heads/
 
 ---
 
+<a id="top"></a>
+
 ## Table of Contents
 
 1. [Architecture Overview](#1-architecture-overview)
 2. [Project Structure](#2-project-structure)
 3. [Dashboard Pages](#3-dashboard-pages)
 4. [API Endpoints](#4-api-endpoints)
-5. [Artifacts & Data Pipeline](#5-artifacts--data-pipeline)
+5. [Analysis Pipeline & Artifacts](#5-analysis-pipeline--artifacts)
 6. [Shared Constants & Branding](#6-shared-constants--branding)
 7. [Environment Variables](#7-environment-variables)
 8. [Requirements](#8-requirements)
@@ -72,6 +74,8 @@ The system is split into two independent services that communicate over REST:
 Both services are containerized with separate Dockerfiles and can be deployed to any Docker-compatible host (Render, Railway, Fly.io, AWS ECS, GCP Cloud Run, etc.).
 
 **Why two services?** The API can be consumed independently — by the dashboard, by Wealthtender's own WordPress site, or by any other frontend. The dashboard is a read-only visualization layer.
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -143,6 +147,8 @@ requirements.txt              Runtime dependencies (API + dashboard)
 requirements-pipeline.txt     Pipeline dependencies (includes runtime deps)
 ```
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 3. Dashboard Pages
@@ -178,11 +184,13 @@ Two sections:
 ### Methodology (`/methodology`)
 Documentation of analytical methods, scoring approaches, and data pipeline. Collapsible accordion sections.
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 4. API Endpoints
 
-All endpoints prefixed with `/api/`. Authentication via `X-API-Key` header (see [Auth & Security](#12-auth--security)).
+All endpoints prefixed with `/api/`. Authentication via `X-API-Key` header (see [Auth & Security](#13-auth--security)).
 
 ### Core
 | Endpoint | Description |
@@ -232,6 +240,8 @@ These endpoints exist in the API but are not currently used by the dashboard fro
 | `GET /api/firm/{firm_id}/benchmarks` | Firm benchmark data |
 | `GET /api/firm/{firm_id}/personas` | Firm persona clusters |
 | `GET /api/reviews/{review_id}` | Single review by ID |
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -477,6 +487,8 @@ LLM scoring is a one-time batch cost, not per-request — scored results are sto
 
 **Recommended Path:** Implement Option A first (a weekend of work, biggest bang for buck), then layer on Option B if time allows. The progression from pure embeddings → LLM-expanded embeddings → hybrid blending tells a strong analytical story.
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 6. Shared Constants & Branding
@@ -486,6 +498,8 @@ LLM scoring is a one-time batch cost, not per-request — scored results are sto
 **`dashboard/branding.py`** — Colors (`COLORS`), data-viz palette (`DATA_VIZ_PALETTE`), font family, and full CSS theme. The `ensure_theme_css()` function auto-writes `assets/theme.css` at startup, so the CSS stays in sync with the Python constants.
 
 **`dashboard/roles.py`** — Role definitions (`admin`, `firm`) with page access lists. When Wealthtender integrates real auth, this is the file to edit.
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -501,6 +515,8 @@ All settings have sensible defaults for local development — zero configuration
 | `ADMIN_PASSWORD` | `WT$msba2026` | Dashboard | Password for the admin portal |
 
 See `.env.example` for the full list with comments.
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -520,6 +536,8 @@ See `.env.example` for the full list with comments.
 | `gunicorn` | ≥21.2.0 | Production WSGI server for Dash |
 
 **Pipeline only** (in `requirements-pipeline.txt`, not needed at runtime): `sentence-transformers`, `nltk`, `numpy`, `pyarrow`, `torch`
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -550,6 +568,8 @@ bash run_data_pipeline.sh --stage embed
 bash run_data_pipeline.sh --stage score
 ```
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 10. Docker Compose
@@ -561,6 +581,8 @@ docker compose down            # stop
 ```
 
 Dashboard at `http://localhost:8050`, API at `http://localhost:8000`.
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -578,6 +600,8 @@ This project is licensed under the **Apache License 2.0** — see [LICENSE](./LI
 The NOTICE file contains the required attribution text and the full list of contributors. If you deploy a modified version, the NOTICE and LICENSE must travel with it.
 
 **Built by** the UT Austin McCombs School of Business MSBA Capstone Team (2026) in partnership with Wealthtender, with significant development assistance from Claude (Anthropic).
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -601,6 +625,8 @@ A `render.yaml` blueprint is included for Render. The project is currently deplo
 
 These URLs will change when the project is migrated off Render. Update `API_BASE` on the dashboard accordingly.
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 13. Auth & Security
@@ -610,6 +636,8 @@ The API rejects any request without a valid `X-API-Key` header. The dashboard se
 
 ### Admin Password (user-facing)
 The splash page admin portal requires `ADMIN_PASSWORD`. The check is server-side and cannot be bypassed from the browser.
+
+<sup>[back to top](#top)</sup>
 
 ---
 
@@ -644,6 +672,8 @@ Run the dashboard on a subdomain (e.g., `analytics.wealthtender.com`) and link t
 - CORS is currently set to `allow_origins=["*"]` — tighten to your production domain when going live
 - The dashboard's CSS and branding (`dashboard/branding.py`) can be adjusted to match Wealthtender's WordPress theme colors
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 15. Production Auth Upgrade Roadmap
@@ -667,6 +697,8 @@ When Wealthtender's engineering team replaces the prototype auth:
 | `dashboard/roles.py` | Role definitions and page permissions |
 | `api/main.py` | `X-API-Key` middleware — swap for JWT/OAuth validation |
 
+<sup>[back to top](#top)</sup>
+
 ---
 
 ## 16. Key Links
@@ -682,3 +714,5 @@ When Wealthtender's engineering team replaces the prototype auth:
 | License | [LICENSE](./LICENSE) (Apache 2.0) |
 | Attribution Notice | [NOTICE](./NOTICE) |
 | Wealthtender | [wealthtender.com](https://wealthtender.com) |
+
+<sup>[back to top](#top)</sup>
