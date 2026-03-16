@@ -1,8 +1,9 @@
 """Comparisons page for Wealthtender Dashboard.
 
-Provides interactive visualizations for:
-1. Intra-Firm Team Comparison (FB-16): Side-by-side radar/bar charts of all advisors within a group
-2. Entity-to-Entity Comparison (FB-17): Overlaid spider charts comparing two entities
+Provides head-to-head entity comparison (FB-17): overlaid spider charts
+and a detailed score table comparing two entities across all six dimensions.
+
+Team comparisons (FB-16) have been split out to team_comparisons.py.
 """
 
 import dash
@@ -12,8 +13,6 @@ import plotly.graph_objects as go
 from dashboard.branding import COLORS, DATA_VIZ_PALETTE, FONT_FAMILY
 from dashboard.constants import DIMENSIONS, DIM_LABELS, DIM_SHORT
 from dashboard.services.api import (
-    get_partner_groups,
-    get_partner_group_members,
     get_dna_entities,
     get_entity_comparison,
 )
@@ -212,94 +211,6 @@ def layout():
                 ],
             ),
 
-            # ===== Section 2: Team Comparison (mocked data) =====
-            _section_card(
-                "Team Comparison",
-                "Select a partner group to view side-by-side performance "
-                "profiles of all advisors within a firm.",
-                COLORS["soft_blue"],
-                [
-                    # Dev mode banner — scoped to this section only
-                    html.Div(
-                        style={
-                            "display": "flex", "alignItems": "flex-start",
-                            "lineHeight": "1.5",
-                            "padding": "12px 14px", "backgroundColor": "#fef3c7",
-                            "borderLeft": "4px solid #f59e0b", "borderRadius": "4px",
-                            "color": "#78350f", "fontSize": "12px",
-                            "fontFamily": FONT_FAMILY, "marginBottom": "20px",
-                        },
-                        children=[
-                            html.Span("Dev Mode: ",
-                                      style={"fontWeight": "600",
-                                             "marginRight": "4px"}),
-                            html.Span(
-                                "Partner group associations are mocked for "
-                                "development. Will be replaced with real data "
-                                "in production."),
-                        ],
-                    ),
-
-                    # Controls Row
-                    html.Div(
-                        style={"display": "flex", "gap": "16px",
-                               "marginBottom": "20px", "flexWrap": "wrap"},
-                        children=[
-                            html.Div(
-                                style={"flex": "2", "minWidth": "250px"},
-                                children=[
-                                    html.Label("Firm / Partner Group:", style={
-                                        "fontWeight": "600", "marginBottom": "6px",
-                                        "display": "block",
-                                        "color": COLORS["ink"], "fontSize": "12px"}),
-                                    dcc.Dropdown(
-                                        id="team-partner-group-dropdown",
-                                        placeholder="Choose a firm...",
-                                        style={"fontSize": "13px"}),
-                                ],
-                            ),
-                            html.Div(
-                                style={"flex": "1", "minWidth": "180px"},
-                                children=[
-                                    html.Label("Calculation Method:", style={
-                                        "fontWeight": "600", "marginBottom": "6px",
-                                        "display": "block",
-                                        "color": COLORS["ink"], "fontSize": "12px"}),
-                                    dcc.Dropdown(
-                                        id="team-method-dropdown",
-                                        options=[
-                                            {"label": "Mean", "value": "mean"},
-                                            {"label": "Penalized", "value": "penalized"},
-                                            {"label": "Weighted", "value": "weighted"},
-                                        ],
-                                        value="mean",
-                                        style={"fontSize": "13px"}),
-                                ],
-                            ),
-                        ],
-                    ),
-
-                    # Team Spider Chart
-                    _chart_card([
-                        dcc.Graph(
-                            id="team-spider-chart",
-                            figure=_empty_fig("Select a partner group above", 400),
-                            config={"responsive": True, "displayModeBar": False},
-                            style={"height": "400px"},
-                        ),
-                    ]),
-
-                    # Team Bar Chart
-                    _chart_card([
-                        dcc.Graph(
-                            id="team-bar-chart",
-                            figure=_empty_fig("Select a partner group above", 350),
-                            config={"responsive": True, "displayModeBar": False},
-                            style={"height": "350px"},
-                        ),
-                    ], margin_bottom="0"),
-                ],
-            ),
         ],
     )
 
@@ -307,123 +218,6 @@ def layout():
 # =============================================================================
 # CALLBACKS
 # =============================================================================
-
-@callback(
-    Output("team-partner-group-dropdown", "options"),
-    Output("team-partner-group-dropdown", "value"),
-    Input("team-partner-group-dropdown", "id"),
-)
-def populate_partner_groups(_):
-    """Populate partner group dropdown on page load."""
-    groups = get_partner_groups()
-    if not groups:
-        return [], None
-    options = [
-        {"label": f"{g['partner_group_name']} ({g.get('member_count', '?')} members)",
-         "value": g["partner_group_code"]}
-        for g in groups
-    ]
-    return options, groups[0]["partner_group_code"]
-
-
-@callback(
-    Output("team-spider-chart", "figure"),
-    Output("team-bar-chart", "figure"),
-    Input("team-partner-group-dropdown", "value"),
-    Input("team-method-dropdown", "value"),
-)
-def update_team_charts(group_code, method):
-    """Update team comparison charts."""
-    if not group_code:
-        return _empty_fig("Select a partner group", 400), \
-               _empty_fig("Select a partner group", 350)
-
-    data = get_partner_group_members(group_code, method=method)
-    if not data or not data.get("members"):
-        return _empty_fig("No data for this group", 400), \
-               _empty_fig("No data for this group", 350)
-
-    members = data["members"]
-    colors = DATA_VIZ_PALETTE[:len(members)]
-    group_name = data.get("group_name", group_code)
-
-    def _get_dim_val(scores, dim, key="percentile"):
-        """Extract a value from enriched or legacy score dicts."""
-        v = scores.get(dim, {})
-        if isinstance(v, dict):
-            return v.get(key, 0) or 0
-        return v or 0
-
-    # Spider chart — percentile scale for consistency
-    spider_fig = go.Figure()
-    for idx, member in enumerate(members):
-        name = member.get("advisor_name", "Unknown")
-        scores = member.get("scores", {})
-        values = [_get_dim_val(scores, dim, "percentile") for dim in DIMENSIONS]
-        values.append(values[0])  # close loop
-        ordinals = [_ordinal(v) for v in values]
-
-        spider_fig.add_trace(go.Scatterpolar(
-            r=values,
-            theta=[DIM_SHORT[d] for d in DIMENSIONS] + [DIM_SHORT[DIMENSIONS[0]]],
-            fill="toself", name=name,
-            line={"color": colors[idx], "width": 2},
-            fillcolor=colors[idx], opacity=0.5,
-            customdata=ordinals,
-            hovertemplate="%{theta}<br>Percentile: %{customdata}<extra></extra>",
-        ))
-
-    spider_fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100],
-                            tickfont={"size": 10, "family": FONT_FAMILY},
-                            gridcolor=COLORS["border"]),
-            angularaxis=dict(tickfont={"size": 11, "family": FONT_FAMILY}),
-            bgcolor="rgba(255,255,255,0.5)",
-        ),
-        font={"family": FONT_FAMILY, "size": 12},
-        hovermode="closest", showlegend=True,
-        legend={"orientation": "h", "y": -0.15, "x": 0.5, "xanchor": "center",
-                "font": {"size": 11}},
-        title={"text": f"{group_name} — Performance Profiles (Percentile)",
-               "x": 0.5, "xanchor": "center",
-               "font": {"size": 15, "color": COLORS["ink"]}},
-        margin={"l": 60, "r": 60, "t": 60, "b": 80},
-        height=400,
-        paper_bgcolor="white",
-    )
-
-    # Bar chart — percentile scale
-    bar_fig = go.Figure()
-    for idx, member in enumerate(members):
-        name = member.get("advisor_name", "Unknown")
-        scores = member.get("scores", {})
-        values = [_get_dim_val(scores, dim, "percentile") for dim in DIMENSIONS]
-        bar_fig.add_trace(go.Bar(
-            name=name,
-            x=[DIM_SHORT[d] for d in DIMENSIONS],
-            y=values, marker={"color": colors[idx]}, opacity=0.85,
-        ))
-
-    bar_fig.update_layout(
-        barmode="group",
-        title={"text": "Team Percentile Ranks by Dimension", "x": 0.5, "xanchor": "center",
-               "font": {"size": 15, "color": COLORS["ink"]}},
-        xaxis={"title": "", "tickfont": {"size": 11}},
-        yaxis={"title": "Percentile Rank", "tickfont": {"size": 11},
-               "title_font": {"size": 12}, "range": [0, 105],
-               "gridcolor": COLORS["border"]},
-        font={"family": FONT_FAMILY, "size": 12},
-        hovermode="x unified",
-        legend={"orientation": "h", "y": -0.18, "x": 0.5, "xanchor": "center",
-                "font": {"size": 11}},
-        margin={"l": 50, "r": 20, "t": 60, "b": 70},
-        height=350,
-        paper_bgcolor="white", plot_bgcolor="white",
-    )
-
-    return spider_fig, bar_fig
-
 
 @callback(
     Output("entity-a-dropdown", "options"),

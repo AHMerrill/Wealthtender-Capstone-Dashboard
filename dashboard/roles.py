@@ -28,6 +28,7 @@ ROLES = {
             "/benchmarks",
             "/leaderboard",
             "/comparisons",
+            "/team-comparisons",
             "/methodology",
         ],
         "show_firm_picker": True,
@@ -41,6 +42,7 @@ ROLES = {
             "/benchmarks",
             "/leaderboard",
             "/comparisons",
+            "/team-comparisons",
         ],
         "show_firm_picker": False,   # firm comes from auth context
         "firm_locked": True,
@@ -77,5 +79,7 @@ def nav_links_for_role(role: str) -> list[tuple[str, str]]:
             label = "EDA"
         elif path == "/advisor-dna":
             label = "Advisor DNA"
+        elif path == "/team-comparisons":
+            label = "Team Comparisons"
         links.append((label, path))
     return links
