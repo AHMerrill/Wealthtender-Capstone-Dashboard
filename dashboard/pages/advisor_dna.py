@@ -29,6 +29,7 @@ DIM_DESCRIPTIONS = {
     "responsiveness_availability": "Advisors are accessible and respond promptly to client needs.",
     "life_event_support": "Guidance through major transitions \u2014 retirement, inheritance, career changes.",
     "investment_expertise": "Demonstrated knowledge of markets, portfolios, and financial strategy.",
+    "outcomes_results": "Tangible results and measurable progress toward real-world financial goals.",
 }
 
 DIM_QUERY_TEXTS = {
@@ -38,6 +39,7 @@ DIM_QUERY_TEXTS = {
     "responsiveness_availability": "The level of service is exceptional; they are always accessible, easy to reach, and promptly return calls or emails within hours, not days. Whether I have a quick question or an urgent concern during market volatility or a personal crisis, they are responsive, attentive, and reliable, providing the immediate support and availability I need to feel taken care of and less anxious about my liquidity and financial health.",
     "life_event_support": "Beyond being a numbers person, they have been a compassionate counselor and supportive partner through major life transitions, including retirement, career changes, marriages, inheritance, or the loss of a loved one. They provide empathy, patience, and guidance during emotional times, offering perspective and hand-holding that goes far beyond a spreadsheet to address the human element and life context of my wealth management.",
     "investment_expertise": "I have total confidence in their technical proficiency, investment pedigree, and deep market knowledge. They are a savvy, highly skilled professional with the credentials and expertise to navigate complex asset allocations, tax strategies, and market cycles. Their competence and strategic insight ensure my portfolio is well-positioned for long-term growth, wealth preservation, and solid returns that meet or exceed my financial expectations.",
+    "outcomes_results": "My advisor has delivered tangible results and measurable progress toward my real-world goals, ensuring I have achieved milestones like becoming debt-free, funding a college education, or reaching retirement readiness. They have successfully implemented my tax strategies, finalized estate documents, and consolidated my accounts, demonstrating the follow-through and execution needed to advance my financial plan, avoid costly mistakes, and effectively course-correct when the market or my life changed.",
 }
 
 _DIM_LABEL_TO_KEY = {v: k for k, v in DIM_LABELS.items()}
@@ -330,6 +332,7 @@ _DIM_SHORT_LABELS = {
     "responsiveness_availability": "Responsive",
     "life_event_support": "Life Events",
     "investment_expertise": "Expertise",
+    "outcomes_results": "Outcomes",
 }
 
 
@@ -444,7 +447,7 @@ def _desc_grid(prefix):
     return html.Div(
         style={
             "display": "grid",
-            "gridTemplateColumns": "repeat(6, 1fr)",
+            "gridTemplateColumns": f"repeat({len(DIMENSIONS)}, 1fr)",
             "gap": "10px",
             "marginTop": "16px",
         },

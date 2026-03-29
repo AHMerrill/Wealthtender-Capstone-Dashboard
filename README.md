@@ -123,7 +123,7 @@ data/
 artifacts/                    Pre-built data artifacts (loaded at startup)
   macro_insights/             EDA artifacts (reviews, lexical, quality)
   scoring/
-    review_dimension_scores.csv    Per-review cosine similarity scores (6 dimensions)
+    review_dimension_scores.csv    Per-review cosine similarity scores (7 dimensions)
     advisor_dimension_scores.csv   Aggregated entity-level scores (mean, penalized, weighted)
     partner_groups_mock.csv        Synthetic firm-advisor associations (dev/demo)
   metadata.json               Artifact manifest
@@ -315,7 +315,7 @@ data/raw/wealthtender_reviews.csv         (single raw CSV from Wealthtender)
 │  📄 pipeline/score.py                                    │
 │                                                          │
 │  • Load review embeddings, parse to numpy matrix E_r     │
-│  • Encode 6 dimension query strings → matrix E_q         │
+│  • Encode 7 dimension query strings → matrix E_q         │
 │  • Cosine similarity: S = E_r @ E_q.T (review × dim)    │
 │  • Advisor-level: mean, penalized, weighted similarities │
 │  • Export: review_dimension_scores.csv,                   │
@@ -357,9 +357,9 @@ To make the pipeline concrete, here is what happens to a single real review as i
 
 **Stage 2b — embed.py (weighted-by-time)** runs a second, separate embedding pass using different settings from a collaborator's notebook. It loads the same `reviews_clean.csv` but applies only a simple full-name replacement for advisor name removal (no per-token stripping, no stopword removal on the embedding input). It encodes with `normalize_embeddings=False`, producing unnormalized vectors whose norms vary (~0.3–0.9). For each advisor, it computes a time-weighted mean embedding using half-life decay weights: recent reviews count more (w = 0.5^(age_years/2.0)). The weighted aggregation is intentionally NOT L2-normalized afterward. Diagnostic columns include effective_n_time (Kish's formula) and review date ranges. Output: `data/intermediate/df_advisors_weighted_time.parquet`.
 
-**Stage 3 — score.py** loads the embedding CSV, parses each embedding string back to a numpy array, and stacks them into a matrix E_r. It encodes the six dimension query strings with the same model, producing a 6×384 matrix E_q. The dot product `S = E_r @ E_q.T` yields a 4579×6 matrix of cosine similarities — each cell is how closely one review aligns with one dimension. Our review scores highest on Trust & Integrity (the text mentions "honest," "trustworthy," "secure") and Listening & Personalization ("takes the time to truly listen," "tailoring advice to fit personal needs"). At the advisor level, the mean and penalized similarities are computed by dotting the advisor embedding matrices against E_q. The merged results go to `artifacts/scoring/review_dimension_scores.csv` (per-review) and `advisor_dimension_scores.csv` (per-advisor/firm).
+**Stage 3 — score.py** loads the embedding CSV, parses each embedding string back to a numpy array, and stacks them into a matrix E_r. It encodes the seven dimension query strings with the same model, producing a 7×384 matrix E_q. The dot product `S = E_r @ E_q.T` yields a 4579×7 matrix of cosine similarities — each cell is how closely one review aligns with one dimension. Our review scores highest on Trust & Integrity (the text mentions "honest," "trustworthy," "secure") and Listening & Personalization ("takes the time to truly listen," "tailoring advice to fit personal needs"). At the advisor level, the mean and penalized similarities are computed by dotting the advisor embedding matrices against E_q. The merged results go to `artifacts/scoring/review_dimension_scores.csv` (per-review) and `advisor_dimension_scores.csv` (per-advisor/firm).
 
-**Runtime — api/services/artifacts.py** loads these CSVs into memory when the FastAPI server starts. When a dashboard user selects Omar Morillo, the API looks up his advisor_id, retrieves his six dimension scores, computes percentile ranks within the advisor peer group (`pandas.rank(pct=True) * 100`), min-max normalizes to 0–100, assigns tier labels (e.g., "Very Strong" if ≥75th percentile), and returns the enriched JSON. The dashboard renders this as bar charts, spider charts, and tier badges — all derived from that original raw review row.
+**Runtime — api/services/artifacts.py** loads these CSVs into memory when the FastAPI server starts. When a dashboard user selects Omar Morillo, the API looks up his advisor_id, retrieves his seven dimension scores, computes percentile ranks within the advisor peer group (`pandas.rank(pct=True) * 100`), min-max normalizes to 0–100, assigns tier labels (e.g., "Very Strong" if ≥75th percentile), and returns the enriched JSON. The dashboard renders this as bar charts, spider charts, and tier badges — all derived from that original raw review row.
 
 ### Pipeline Modules
 
@@ -400,7 +400,7 @@ The `pipeline/` package was extracted from these notebooks. They remain in the r
 
 | File | Contents |
 |------|----------|
-| `review_dimension_scores.csv` | Per-review cosine similarity scores for 6 dimensions (~4,600 rows) |
+| `review_dimension_scores.csv` | Per-review cosine similarity scores for 7 dimensions (~4,600 rows) |
 | `advisor_dimension_scores.csv` | Entity-level aggregated scores: mean, penalized, weighted (~334 rows) |
 | `partner_groups_mock.csv` | Synthetic firm-advisor associations for the Comparisons tab (dev/demo) |
 
@@ -444,7 +444,7 @@ The API is deliberately storage-agnostic — it receives DataFrames and serves J
 
 The current system is snapshot-based — artifacts are static files baked into the API Docker image at build time. For a production system with continuously incoming reviews, the natural upgrade path is: new reviews land in the database → a scheduled job reruns the pipeline stages and writes updated scores back to the database → the API queries the database on each request instead of reading from memory. This is a backend-only migration.
 
-### Six Dimensions
+### Seven Dimensions
 | Key | Label |
 |-----|-------|
 | `trust_integrity` | Trust & Integrity |
@@ -453,6 +453,7 @@ The current system is snapshot-based — artifacts are static files baked into t
 | `responsiveness_availability` | Responsiveness |
 | `life_event_support` | Life Event Support |
 | `investment_expertise` | Investment Expertise |
+| `outcomes_results` | Outcomes & Results |
 
 ### Known Limitations of Cosine Similarity Scoring
 
@@ -467,10 +468,10 @@ These are inherent limitations of embedding-based cosine similarity — not bugs
 
 ### Alternative: LLM-Enhanced Scoring Pipelines
 
-A large language model (LLM) can address the cosine similarity limitations above by *reading and reasoning about* each review. Below are three approaches, ordered from easiest to most robust. All use a lightweight model like GPT-4o-mini or Claude Haiku. The six DNA dimensions remain the same — what changes is how reviews are scored against them.
+A large language model (LLM) can address the cosine similarity limitations above by *reading and reasoning about* each review. Below are three approaches, ordered from easiest to most robust. All use a lightweight model like GPT-4o-mini or Claude Haiku. The seven DNA dimensions remain the same — what changes is how reviews are scored against them.
 
 **Option A: LLM-Expanded Embeddings (Easiest)**
-Before embedding reviews, run each one through an LLM with a prompt like: "Expand this review into explicit statements about each of our 6 DNA dimensions." A short review like "they were patient and listened" becomes structured sentences about trust, communication, empathy, etc. Then embed *that* expanded text instead of the raw review. The entire downstream pipeline stays exactly the same — cosine similarity, percentiles, tiers, all of it. Zero changes to the dashboard or API. The big win is that short or vague reviews now produce meaningful scores because the LLM fills in implicit meaning before the embedding step runs.
+Before embedding reviews, run each one through an LLM with a prompt like: "Expand this review into explicit statements about each of our 7 DNA dimensions." A short review like "they were patient and listened" becomes structured sentences about trust, communication, empathy, etc. Then embed *that* expanded text instead of the raw review. The entire downstream pipeline stays exactly the same — cosine similarity, percentiles, tiers, all of it. Zero changes to the dashboard or API. The big win is that short or vague reviews now produce meaningful scores because the LLM fills in implicit meaning before the embedding step runs.
 
 **Option B: Score Blending (Most Robust)**
 Run both pipelines independently. The current embedding pipeline produces cosine similarity scores per dimension. A separate LLM pass reads each review, rates it 0–100 on each dimension with a confidence score, and returns structured JSON. Normalize both score sets to the same 0–100 scale, then blend them — e.g., 40% embedding + 60% LLM, weighted by the LLM's confidence. Aggregate to advisor level the same as now. The embedding catches semantic similarity the LLM might miss; the LLM catches context and meaning that embeddings miss. They cover each other's blind spots. Blend weights can be calibrated against a small set of human-labeled reviews for validation.

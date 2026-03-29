@@ -141,10 +141,7 @@ def run(embeddings_csv=None, advisor_parquet=None, weighted_parquet=None):
 
     review_cols = [
         "advisor_id", "advisor_name", "entity_type", "review_text_raw",
-        "sim_trust_integrity", "sim_listening_personalization",
-        "sim_communication_clarity", "sim_responsiveness_availability",
-        "sim_life_event_support", "sim_investment_expertise",
-    ]
+    ] + [f"sim_{l}" for l in query_labels]
     review_path = os.path.join(config.SCORING_DIR, "review_dimension_scores.csv")
     df[review_cols].to_csv(review_path, index_label="review_idx")
     print(f"Exported {len(df)} review scores to {review_path}")

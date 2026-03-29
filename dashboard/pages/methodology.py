@@ -20,7 +20,7 @@ SECTIONS = [
                 "financial advisor quality based on client reviews collected by Wealthtender. "
                 "It combines natural language processing (NLP), embedding-based semantic "
                 "similarity scoring, and interactive data visualization to surface insights "
-                "across six dimensions of advisor quality."
+                "across seven dimensions of advisor quality."
             ),
             html.P(
                 "The analytical pipeline is packaged as a standalone Python module (pipeline/) "
@@ -84,8 +84,8 @@ SECTIONS = [
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "Loads review embeddings, parses each embedding string back to a numpy array, and "
-                "stacks them into a matrix E_r. Encodes the six dimension query strings with the same "
-                "model into a 6\u00d7384 matrix E_q. Computes cosine similarity via the dot product "
+                "stacks them into a matrix E_r. Encodes the seven dimension query strings with the same "
+                "model into a 7\u00d7384 matrix E_q. Computes cosine similarity via the dot product "
                 "S = E_r @ E_q\u1d40, producing a score for every (review, dimension) pair. At the "
                 "advisor level, mean and penalized embedding matrices are dotted against E_q to "
                 "produce entity-level scores. Exports review_dimension_scores.csv and "
@@ -161,11 +161,11 @@ SECTIONS = [
                      style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "The review's 384-dim embedding is stacked with all other review embeddings into a "
-                "matrix E_r. The six dimension query strings are encoded into a 6\u00d7384 matrix "
+                "matrix E_r. The seven dimension query strings are encoded into a 7\u00d7384 matrix "
                 "E_q. The dot product S = E_r @ E_q\u1d40 gives a cosine similarity for every "
                 "(review, dimension) pair. Our review scores highest on Trust & Integrity (the text "
                 "mentions 'honest,' 'trustworthy,' 'secure') and Listening & Personalization ('takes "
-                "the time to truly listen,' 'tailoring advice'). These six scores are written to "
+                "the time to truly listen,' 'tailoring advice'). These seven scores are written to "
                 "review_dimension_scores.csv. Omar's advisor-level scores (mean, penalized, weighted) "
                 "are written to advisor_dimension_scores.csv."
             ),
@@ -174,7 +174,7 @@ SECTIONS = [
             html.P(
                 "When the FastAPI server starts, it loads both scoring CSVs into memory. A dashboard "
                 "user navigates to Advisor DNA and selects Omar Morillo. The API looks up his "
-                "advisor_id, retrieves his six dimension scores, computes percentile ranks within "
+                "advisor_id, retrieves his seven dimension scores, computes percentile ranks within "
                 "the advisor peer group, min-max normalizes to 0\u2013100, and assigns tier labels "
                 "(e.g., 'Very Strong' if \u226575th percentile). The dashboard renders this as bar "
                 "charts, spider charts, and tier badges \u2014 all derived from that original raw "
@@ -306,7 +306,7 @@ SECTIONS = [
             ),
             html.H4("Dimension Query Strings", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "Six carefully crafted query strings define the quality dimensions. Each query is "
+                "Seven carefully crafted query strings define the quality dimensions. Each query is "
                 "a detailed paragraph (approximately 60–80 words) describing the ideal client "
                 "experience for that dimension. These queries were developed through subject matter "
                 "expertise, analysis of real client reviews, and iterative refinement with large "
@@ -314,8 +314,9 @@ SECTIONS = [
                 "beyond simple keyword matching."
             ),
             html.P(
-                "The six dimensions are: Trust & Integrity, Customer Empathy & Personalization, "
-                "Communication Clarity, Responsiveness, Life Event Support, and Investment Expertise."
+                "The seven dimensions are: Trust & Integrity, Customer Empathy & Personalization, "
+                "Communication Clarity, Responsiveness, Life Event Support, Investment Expertise, "
+                "and Outcomes & Results."
             ),
         ],
     },
@@ -331,8 +332,8 @@ SECTIONS = [
             ),
             html.H4("Review-Level Scores", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "For each review, cosine similarity is computed against all six dimension query "
-                "embeddings, producing a 6-dimensional score vector per review. This is stored in "
+                "For each review, cosine similarity is computed against all seven dimension query "
+                "embeddings, producing a 7-dimensional score vector per review. This is stored in "
                 "review_dimension_scores.csv with columns sim_trust_integrity, sim_listening_personalization, "
                 "etc. These per-review scores are the atomic unit of the scoring system."
             ),
@@ -430,7 +431,7 @@ SECTIONS = [
             html.H4("Composite Score", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "The composite score is the arithmetic mean of an entity's scores across all "
-                "six dimensions. It is computed server-side and enriched with its own percentile "
+                "seven dimensions. It is computed server-side and enriched with its own percentile "
                 "rank, normalized value, and tier label — just like individual dimensions. The "
                 "Leaderboard defaults to composite ranking, providing a single overall measure "
                 "of advisor performance."
@@ -657,7 +658,7 @@ SECTIONS = [
             html.H4("Review-Level Spider", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "When drilling into a single review, a spider chart displays that review's "
-                "six-dimensional similarity profile. The legend is placed externally to avoid "
+                "seven-dimensional similarity profile. The legend is placed externally to avoid "
                 "label overlap on the radar grid. This allows direct comparison of how strongly "
                 "a single review aligns with each quality dimension."
             ),

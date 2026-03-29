@@ -13,6 +13,7 @@ DIMENSIONS = [
     "responsiveness_availability",
     "life_event_support",
     "investment_expertise",
+    "outcomes_results",
 ]
 
 DIM_LABELS = {
@@ -22,6 +23,7 @@ DIM_LABELS = {
     "responsiveness_availability": "Responsiveness",
     "life_event_support": "Life Event Support",
     "investment_expertise": "Investment Expertise",
+    "outcomes_results": "Outcomes & Results",
 }
 
 DIM_SHORT = {
@@ -31,6 +33,7 @@ DIM_SHORT = {
     "responsiveness_availability": "Responsive",
     "life_event_support": "Life Events",
     "investment_expertise": "Expertise",
+    "outcomes_results": "Outcomes",
 }
 
 # Indices intentionally skip palette[4] (deep navy, too close to palette[0]).
@@ -41,4 +44,5 @@ DIM_COLORS = {
     "responsiveness_availability": DATA_VIZ_PALETTE[3],
     "life_event_support": DATA_VIZ_PALETTE[5],
     "investment_expertise": DATA_VIZ_PALETTE[6],
+    "outcomes_results": DATA_VIZ_PALETTE[7],
 }

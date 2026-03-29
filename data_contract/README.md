@@ -38,9 +38,9 @@ Entity-level aggregated scores. One row per entity (advisor or firm). Each dimen
 | `sim_penalized_{dimension}` | float (0–1) | Mean with consistency penalty (high variance reduces score) |
 | `sim_weighted_{dimension}` | float (0–1) | Time-decay weighted mean (recent reviews weighted higher) |
 
-Where `{dimension}` is one of: `trust_integrity`, `listening_personalization`, `communication_clarity`, `responsiveness_availability`, `life_event_support`, `investment_expertise`.
+Where `{dimension}` is one of: `trust_integrity`, `listening_personalization`, `communication_clarity`, `responsiveness_availability`, `life_event_support`, `investment_expertise`, `outcomes_results`.
 
-This gives 18 score columns total (6 dimensions x 3 methods).
+This gives 21 score columns total (7 dimensions x 3 methods).
 
 ---
 
@@ -135,7 +135,7 @@ When the dashboard requests scores from the API, each dimension score is returne
 
 ### `/api/leaderboard` Response
 
-Accepts `dimension` param: `"all"` (default, returns all 6 + composite), a single dimension key, or `"composite"`.
+Accepts `dimension` param: `"all"` (default, returns all 7 + composite), a single dimension key, or `"composite"`.
 
 ```json
 {

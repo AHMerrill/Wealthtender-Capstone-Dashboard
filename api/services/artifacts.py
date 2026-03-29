@@ -397,6 +397,7 @@ class ArtifactStore:
     _SIM_DIMS = [
         "trust_integrity", "listening_personalization", "communication_clarity",
         "responsiveness_availability", "life_event_support", "investment_expertise",
+        "outcomes_results",
     ]
     _REVIEW_SIM_COLS = [f"sim_{d}" for d in _SIM_DIMS]
 
@@ -469,7 +470,7 @@ class ArtifactStore:
         return enriched
 
     def _compute_composite(self, raw_scores: Dict[str, float]) -> float:
-        """Mean across all 6 dimensions (mirrors former frontend calculation)."""
+        """Mean across all 7 dimensions (mirrors former frontend calculation)."""
         vals = [raw_scores.get(d, 0.0) for d in self._SIM_DIMS]
         return sum(vals) / len(vals) if vals else 0.0
 
@@ -789,7 +790,7 @@ class ArtifactStore:
                     dimension: str = "all") -> Dict:
         """Top-N entities per dimension (or composite).
 
-        dimension: "all" returns all 6 + composite, or pass a single dim key
+        dimension: "all" returns all 7 + composite, or pass a single dim key
                    or "composite" to get just that one.
 
         Each entry is enriched with percentile, normalized, and tier.

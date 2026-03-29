@@ -42,7 +42,7 @@ A single review enters here as a row in the CSV and flows through the full pipel
 
 1. **clean.py** — normalizes text, removes test accounts, strips boilerplate, exports `reviews_clean.csv`
 2. **embed.py** — tokenizes, removes stopwords and advisor names, encodes into a 384-dim vector via `all-MiniLM-L6-v2`
-3. **score.py** — computes cosine similarity against 6 dimension queries, aggregates to advisor level
+3. **score.py** — computes cosine similarity against 7 dimension queries, aggregates to advisor level
 4. **API** — loads the resulting CSVs, adds percentiles/tiers on the fly, serves JSON to the dashboard
 
 See the main README Section 5 for the full "water droplet" walkthrough.

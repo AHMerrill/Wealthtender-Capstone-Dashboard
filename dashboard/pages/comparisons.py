@@ -1,7 +1,7 @@
 """Comparisons page for Wealthtender Dashboard.
 
 Provides head-to-head entity comparison (FB-17): overlaid spider charts
-and a detailed score table comparing two entities across all six dimensions.
+and a detailed score table comparing two entities across all seven dimensions.
 
 Team comparisons (FB-16) have been split out to team_comparisons.py.
 """
@@ -89,7 +89,7 @@ def layout():
             _section_card(
                 "Head-to-Head Comparison",
                 "Select two entities to compare their Advisor DNA performance "
-                "profiles across all six dimensions.",
+                "profiles across all seven dimensions.",
                 COLORS.get("soft_lavender", "#f3f0ff"),
                 [
                     # Controls Row

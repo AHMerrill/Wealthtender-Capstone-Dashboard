@@ -497,12 +497,7 @@ def update_entity_dropdown(entities_data, entity_type):
 
 
 @callback(
-    Output("benchmarks-hist-trust_integrity", "figure"),
-    Output("benchmarks-hist-listening_personalization", "figure"),
-    Output("benchmarks-hist-communication_clarity", "figure"),
-    Output("benchmarks-hist-responsiveness_availability", "figure"),
-    Output("benchmarks-hist-life_event_support", "figure"),
-    Output("benchmarks-hist-investment_expertise", "figure"),
+    *[Output(f"benchmarks-hist-{d}", "figure") for d in DIMENSIONS],
     Input("benchmarks-distributions", "data"),
     Input("benchmarks-entity-search", "value"),
     Input("benchmarks-method-select", "value"),
@@ -511,7 +506,7 @@ def update_entity_dropdown(entities_data, entity_type):
 def update_histograms(distributions, selected_entity, method, pool):
     """Update histograms for all dimensions."""
     if not distributions:
-        return [go.Figure()] * 6
+        return [go.Figure()] * len(DIMENSIONS)
 
     # Get entity scores if selected — extract raw values for histogram markers
     entity_raw_scores = {}
