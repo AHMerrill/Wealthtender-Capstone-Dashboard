@@ -186,8 +186,11 @@ def eda_charts(
 # ---------------------------------------------------------------------------
 
 @app.get("/api/reviews/all")
-def all_reviews():
-    return store.all_reviews_list()
+def all_reviews(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(30, ge=1, le=100),
+):
+    return store.all_reviews_list(offset=offset, limit=limit)
 
 
 @app.get("/api/reviews/{review_id}")

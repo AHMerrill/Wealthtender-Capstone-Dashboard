@@ -80,8 +80,16 @@ def get_eda_charts(params: dict) -> dict:
     return _get("/api/eda/charts", params=params) or {}
 
 
-def get_all_reviews() -> list:
-    return _get("/api/reviews/all") or []
+def get_all_reviews(offset: int = 0, limit: int = 30) -> dict:
+    """Fetch a paginated page of reviews.
+
+    Returns {"items": [...], "total": int, "offset": int, "limit": int}
+    or an empty-result dict on failure.
+    """
+    return _get("/api/reviews/all",
+                params={"offset": offset, "limit": limit}) or {
+        "items": [], "total": 0, "offset": offset, "limit": limit,
+    }
 
 
 def get_review_detail(review_id: str) -> dict:

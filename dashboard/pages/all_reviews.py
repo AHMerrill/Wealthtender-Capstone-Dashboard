@@ -227,7 +227,9 @@ def layout(**_kwargs):
         }),
 
         # Data stores
-        dcc.Store(id="all-reviews-data"),
+        dcc.Store(id="all-reviews-items", data=[]),      # accumulated list items
+        dcc.Store(id="all-reviews-offset", data=0),      # next offset to fetch
+        dcc.Store(id="all-reviews-total", data=0),       # total reviews available
         dcc.Store(id="all-reviews-selected-idx"),
 
         # Load trigger — retries every 3s up to 20 times to handle
@@ -323,42 +325,99 @@ def layout(**_kwargs):
     ])
 
 
+_PAGE_SIZE = 30
+
+
 # ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
 
-# 1. Load review list on page open (retries until data arrives)
+# 1. Initial load — fetch first page (retries on cold-start)
 @callback(
-    Output("all-reviews-data", "data"),
+    Output("all-reviews-items", "data"),
+    Output("all-reviews-offset", "data"),
+    Output("all-reviews-total", "data"),
     Output("all-reviews-load-trigger", "max_intervals"),
     Input("all-reviews-load-trigger", "n_intervals"),
-    State("all-reviews-data", "data"),
+    State("all-reviews-items", "data"),
     prevent_initial_call=True,
 )
-def load_reviews(_, existing):
-    if existing:
-        # Data already loaded — stop the interval
-        return no_update, 0
-    reviews = get_all_reviews()
-    if reviews:
-        return reviews, 0  # got data — stop polling
-    return no_update, 20   # keep retrying
+def initial_load(_, existing_items):
+    if existing_items:
+        return no_update, no_update, no_update, 0  # already loaded
+    resp = get_all_reviews(offset=0, limit=_PAGE_SIZE)
+    items = resp.get("items", [])
+    if items:
+        return items, len(items), resp.get("total", 0), 0
+    return no_update, no_update, no_update, 20  # keep retrying
 
 
-# 2. Render the scrollable list
+# 2. "Load More" button fetches next page and appends
+@callback(
+    Output("all-reviews-items", "data", allow_duplicate=True),
+    Output("all-reviews-offset", "data", allow_duplicate=True),
+    Input("all-reviews-load-more-btn", "n_clicks"),
+    State("all-reviews-items", "data"),
+    State("all-reviews-offset", "data"),
+    prevent_initial_call=True,
+)
+def load_more(_, existing_items, current_offset):
+    if not existing_items:
+        return no_update, no_update
+    resp = get_all_reviews(offset=current_offset, limit=_PAGE_SIZE)
+    new_items = resp.get("items", [])
+    if not new_items:
+        return no_update, no_update
+    combined = existing_items + new_items
+    return combined, current_offset + len(new_items)
+
+
+# 3. Render the scrollable list + "Load More" button
 @callback(
     Output("all-reviews-list-container", "children"),
-    Input("all-reviews-data", "data"),
+    Input("all-reviews-items", "data"),
+    State("all-reviews-total", "data"),
+    State("all-reviews-offset", "data"),
 )
-def render_list(reviews):
-    if not reviews:
+def render_list(items, total, offset):
+    if not items:
         return html.Div("No reviews available.",
                         style={"padding": "20px", "color": COLORS["gray"],
                                "textAlign": "center"})
-    return [_review_list_item(r, i) for i, r in enumerate(reviews)]
+    children = [_review_list_item(r, i) for i, r in enumerate(items)]
+
+    # Show "Load More" if there are still reviews to fetch
+    loaded = offset if offset else len(items)
+    if loaded < (total or 0):
+        remaining = total - loaded
+        children.append(
+            html.Div(style={"padding": "10px", "textAlign": "center"}, children=[
+                html.Button(
+                    f"Load More ({remaining} remaining)",
+                    id="all-reviews-load-more-btn",
+                    n_clicks=0,
+                    style={
+                        "background": COLORS["blue"], "color": "white",
+                        "border": "none", "borderRadius": "6px",
+                        "padding": "8px 16px", "fontSize": "12px",
+                        "cursor": "pointer", "fontWeight": "600",
+                        "width": "100%",
+                    },
+                ),
+            ])
+        )
+    else:
+        # All loaded — show count
+        children.append(
+            html.Div(f"All {total} reviews loaded",
+                     style={"padding": "10px", "textAlign": "center",
+                            "fontSize": "11px", "color": COLORS["gray"]})
+        )
+
+    return children
 
 
-# 3. Handle review selection (pattern-matching callback)
+# 4. Handle review selection (pattern-matching callback)
 @callback(
     Output("all-reviews-selected-idx", "data"),
     Input({"type": "review-list-item", "index": dash.ALL}, "n_clicks"),
@@ -378,7 +437,7 @@ def select_review(n_clicks_list, id_list):
         return no_update
 
 
-# 4. Render detail panel when a review is selected
+# 5. Render detail panel when a review is selected
 @callback(
     Output("all-reviews-detail-panel", "children"),
     Input("all-reviews-selected-idx", "data"),
