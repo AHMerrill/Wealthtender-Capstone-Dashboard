@@ -1,10 +1,12 @@
 """All Reviews browser page for Wealthtender Dashboard.
 
 Three-column layout:
-  Left   – scrollable list of every review (clickable)
+  Left   – paginated list of reviews (10 per page) with Prev / Next
   Middle – selected review text, spider chart, and score table
   Right  – cosine-similarity legend + all 7 canonical dimension query texts
 """
+
+import json
 
 import dash
 from dash import html, dcc, callback, Input, Output, State, no_update
@@ -19,26 +21,43 @@ from dashboard.services.api import get_all_reviews, get_dna_review_detail
 dash.register_page(__name__, path="/all-reviews", name="All Reviews",
                    title="All Reviews")
 
+_PAGE_SIZE = 10
+
+# ---------------------------------------------------------------------------
+# Shared button style
+# ---------------------------------------------------------------------------
+
+_BTN_STYLE = {
+    "background": COLORS["blue"], "color": "white",
+    "border": "none", "borderRadius": "6px",
+    "padding": "6px 14px", "fontSize": "12px",
+    "cursor": "pointer", "fontWeight": "600",
+}
+_BTN_DISABLED = {
+    **_BTN_STYLE,
+    "background": COLORS.get("border", "#e2e8f0"),
+    "color": COLORS.get("gray", "#999"),
+    "cursor": "default",
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _review_list_item(r, idx):
+def _review_list_item(r, idx, selected_idx=None):
     """Build a single clickable row for the left-panel list."""
     advisor = r.get("advisor_name", "Unknown Advisor")
     reviewer = r.get("reviewer_name")
     date = r.get("review_date")
     review_idx = r.get("review_idx", idx)
 
-    # Build subtitle from whichever fields are available
     parts = []
     if reviewer:
         parts.append(reviewer)
     if date:
         parts.append(str(date))
     if not parts:
-        # Fall back to a short preview of the review text if available
         text_raw = r.get("review_text_raw") or ""
         preview = text_raw[:60].strip()
         if preview:
@@ -47,19 +66,29 @@ def _review_list_item(r, idx):
             parts.append(f"Review #{review_idx}")
     subtitle = "  ·  ".join(parts)
 
+    is_selected = (selected_idx is not None and review_idx == selected_idx)
+
+    base_style = {
+        "padding": "10px 12px",
+        "borderBottom": f"1px solid {COLORS['border']}",
+        "cursor": "pointer",
+        "transition": "background 0.12s",
+    }
+    if is_selected:
+        base_style["background"] = COLORS.get("soft_blue", "#e3f5fe")
+        base_style["borderLeft"] = f"3px solid {COLORS['blue']}"
+        base_style["paddingLeft"] = "9px"
+
     return html.Div(
         id={"type": "review-list-item", "index": review_idx},
         n_clicks=0,
-        style={
-            "padding": "10px 12px",
-            "borderBottom": f"1px solid {COLORS['border']}",
-            "cursor": "pointer",
-            "transition": "background 0.12s",
-        },
+        style=base_style,
         children=[
             html.Div(advisor, style={
-                "fontWeight": "600", "fontSize": "13px",
-                "color": COLORS["ink"], "marginBottom": "2px",
+                "fontWeight": "700" if is_selected else "600",
+                "fontSize": "13px",
+                "color": COLORS["blue"] if is_selected else COLORS["ink"],
+                "marginBottom": "2px",
                 "whiteSpace": "nowrap", "overflow": "hidden",
                 "textOverflow": "ellipsis",
             }),
@@ -113,7 +142,7 @@ def _score_table(scores):
     rows = []
     for d in DIMENSIONS:
         val = scores.get(d)
-        display = f"{val:.4f}" if val is not None else "—"
+        display = f"{val:.4f}" if val is not None else "\u2014"
         rows.append(
             html.Div(style={
                 "display": "flex", "justifyContent": "space-between",
@@ -136,9 +165,9 @@ def _similarity_legend():
     """Build a cosine-similarity interpretation guide."""
     bands = [
         ("0.50 +", "Very strong alignment", "#276749", "#F0FFF4"),
-        ("0.35 – 0.50", "Strong alignment", "#2F855A", "#F0FFF4"),
-        ("0.20 – 0.35", "Moderate alignment", "#B7791F", "#FEFCBF"),
-        ("0.10 – 0.20", "Weak alignment", "#C05621", "#FEFCBF"),
+        ("0.35 \u2013 0.50", "Strong alignment", "#2F855A", "#F0FFF4"),
+        ("0.20 \u2013 0.35", "Moderate alignment", "#B7791F", "#FEFCBF"),
+        ("0.10 \u2013 0.20", "Weak alignment", "#C05621", "#FEFCBF"),
         ("< 0.10", "Little to no alignment", "#9B2C2C", "#FFF5F5"),
     ]
     rows = []
@@ -174,11 +203,11 @@ def _similarity_legend():
         }),
         html.Div(rows),
         html.Div(
-            "Cosine similarity measures how closely a review's language "
+            "Cosine similarity measures how closely a review\u2019s language "
             "aligns with the ideal description for each dimension. "
             "Higher values mean the review more strongly reflects "
             "that quality. Values near zero indicate the review "
-            "doesn't address that theme; negative values (rare) "
+            "doesn\u2019t address that theme; negative values (rare) "
             "would suggest opposing language.",
             style={
                 "fontSize": "10px", "color": COLORS["gray"],
@@ -227,9 +256,9 @@ def layout(**_kwargs):
         }),
 
         # Data stores
-        dcc.Store(id="all-reviews-items", data=[]),      # accumulated list items
-        dcc.Store(id="all-reviews-offset", data=0),      # next offset to fetch
-        dcc.Store(id="all-reviews-total", data=0),       # total reviews available
+        dcc.Store(id="all-reviews-page", data=0),         # current page index
+        dcc.Store(id="all-reviews-total", data=0),         # total review count
+        dcc.Store(id="all-reviews-items", data=[]),        # current page items
         dcc.Store(id="all-reviews-selected-idx"),
 
         # Load trigger — retries every 3s up to 20 times to handle
@@ -245,7 +274,7 @@ def layout(**_kwargs):
             "minHeight": "70vh",
         }, children=[
 
-            # ===== LEFT: Scrollable review list =====
+            # ===== LEFT: Review list + pagination =====
             html.Div(style={
                 "border": f"1px solid {COLORS['border']}",
                 "borderRadius": "12px",
@@ -254,7 +283,7 @@ def layout(**_kwargs):
                 "display": "flex",
                 "flexDirection": "column",
             }, children=[
-                html.Div("Reviews", style={
+                html.Div(id="all-reviews-header", children="Reviews", style={
                     "padding": "10px 12px",
                     "fontWeight": "700", "fontSize": "13px",
                     "color": COLORS["blue"],
@@ -265,14 +294,37 @@ def layout(**_kwargs):
                     id="all-reviews-list-container",
                     style={
                         "overflowY": "auto",
-                        "height": "calc(100vh - 160px)",
-                        "minHeight": "500px",
+                        "flex": "1",
+                        "minHeight": "400px",
                     },
                     children=[
                         html.Div("Loading reviews...",
                                  style={"padding": "20px",
                                         "color": COLORS["gray"],
                                         "textAlign": "center"}),
+                    ],
+                ),
+                # Pagination bar (always present in DOM)
+                html.Div(
+                    id="all-reviews-pagination",
+                    style={
+                        "display": "flex",
+                        "justifyContent": "space-between",
+                        "alignItems": "center",
+                        "padding": "8px 10px",
+                        "borderTop": f"1px solid {COLORS['border']}",
+                        "background": COLORS.get("soft_blue", "#e3f5fe"),
+                        "fontSize": "11px",
+                    },
+                    children=[
+                        html.Button("Prev",
+                                    id="all-reviews-prev-btn", n_clicks=0,
+                                    style=_BTN_DISABLED, disabled=True),
+                        html.Span("", id="all-reviews-page-info",
+                                  style={"color": COLORS["gray"]}),
+                        html.Button("Next",
+                                    id="all-reviews-next-btn", n_clicks=0,
+                                    style=_BTN_DISABLED, disabled=True),
                     ],
                 ),
             ]),
@@ -312,7 +364,7 @@ def layout(**_kwargs):
                         "Each review is compared against these ideal "
                         "descriptions using sentence embeddings. The "
                         "cosine similarity score reflects how closely "
-                        "a review's language matches each dimension.",
+                        "a review\u2019s language matches each dimension.",
                         style={
                             "fontSize": "11px", "color": COLORS["gray"],
                             "lineHeight": "1.45", "marginBottom": "12px",
@@ -325,18 +377,21 @@ def layout(**_kwargs):
     ])
 
 
-_PAGE_SIZE = 30
-
-
 # ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
 
-# 1. Initial load — fetch first page (retries on cold-start)
+def _fetch_page(page_num):
+    """Fetch a single page of reviews from the API."""
+    offset = page_num * _PAGE_SIZE
+    return get_all_reviews(offset=offset, limit=_PAGE_SIZE)
+
+
+# 1. Initial load (retries on cold-start)
 @callback(
     Output("all-reviews-items", "data"),
-    Output("all-reviews-offset", "data"),
     Output("all-reviews-total", "data"),
+    Output("all-reviews-page", "data"),
     Output("all-reviews-load-trigger", "max_intervals"),
     Input("all-reviews-load-trigger", "n_intervals"),
     State("all-reviews-items", "data"),
@@ -344,77 +399,92 @@ _PAGE_SIZE = 30
 )
 def initial_load(_, existing_items):
     if existing_items:
-        return no_update, no_update, no_update, 0  # already loaded
-    resp = get_all_reviews(offset=0, limit=_PAGE_SIZE)
+        return no_update, no_update, no_update, 0
+    resp = _fetch_page(0)
     items = resp.get("items", [])
     if items:
-        return items, len(items), resp.get("total", 0), 0
-    return no_update, no_update, no_update, 20  # keep retrying
+        return items, resp.get("total", 0), 0, 0
+    return no_update, no_update, no_update, 20
 
 
-# 2. "Load More" button fetches next page and appends
+# 2. Previous / Next button clicks → fetch that page
 @callback(
     Output("all-reviews-items", "data", allow_duplicate=True),
-    Output("all-reviews-offset", "data", allow_duplicate=True),
-    Input("all-reviews-load-more-btn", "n_clicks"),
-    State("all-reviews-items", "data"),
-    State("all-reviews-offset", "data"),
+    Output("all-reviews-page", "data", allow_duplicate=True),
+    Input("all-reviews-prev-btn", "n_clicks"),
+    Input("all-reviews-next-btn", "n_clicks"),
+    State("all-reviews-page", "data"),
+    State("all-reviews-total", "data"),
     prevent_initial_call=True,
 )
-def load_more(_, existing_items, current_offset):
-    if not existing_items:
+def change_page(prev_clicks, next_clicks, current_page, total):
+    ctx = dash.callback_context
+    if not ctx.triggered:
         return no_update, no_update
-    resp = get_all_reviews(offset=current_offset, limit=_PAGE_SIZE)
-    new_items = resp.get("items", [])
-    if not new_items:
+    trigger_id = ctx.triggered[0]["prop_id"]
+
+    last_page = max(0, (total - 1) // _PAGE_SIZE) if total else 0
+
+    if "prev" in trigger_id:
+        new_page = max(0, current_page - 1)
+    elif "next" in trigger_id:
+        new_page = min(last_page, current_page + 1)
+    else:
         return no_update, no_update
-    combined = existing_items + new_items
-    return combined, current_offset + len(new_items)
+
+    if new_page == current_page:
+        return no_update, no_update
+
+    resp = _fetch_page(new_page)
+    items = resp.get("items", [])
+    return items if items else no_update, new_page
 
 
-# 3. Render the scrollable list + "Load More" button
+# 3. Render the list + update pagination controls
 @callback(
     Output("all-reviews-list-container", "children"),
+    Output("all-reviews-prev-btn", "disabled"),
+    Output("all-reviews-prev-btn", "style"),
+    Output("all-reviews-next-btn", "disabled"),
+    Output("all-reviews-next-btn", "style"),
+    Output("all-reviews-page-info", "children"),
+    Output("all-reviews-header", "children"),
     Input("all-reviews-items", "data"),
+    Input("all-reviews-selected-idx", "data"),
+    State("all-reviews-page", "data"),
     State("all-reviews-total", "data"),
-    State("all-reviews-offset", "data"),
 )
-def render_list(items, total, offset):
+def render_list(items, selected_idx, page, total):
     if not items:
-        return html.Div("No reviews available.",
-                        style={"padding": "20px", "color": COLORS["gray"],
-                               "textAlign": "center"})
-    children = [_review_list_item(r, i) for i, r in enumerate(items)]
-
-    # Show "Load More" if there are still reviews to fetch
-    loaded = offset if offset else len(items)
-    if loaded < (total or 0):
-        remaining = total - loaded
-        children.append(
-            html.Div(style={"padding": "10px", "textAlign": "center"}, children=[
-                html.Button(
-                    f"Load More ({remaining} remaining)",
-                    id="all-reviews-load-more-btn",
-                    n_clicks=0,
-                    style={
-                        "background": COLORS["blue"], "color": "white",
-                        "border": "none", "borderRadius": "6px",
-                        "padding": "8px 16px", "fontSize": "12px",
-                        "cursor": "pointer", "fontWeight": "600",
-                        "width": "100%",
-                    },
-                ),
-            ])
-        )
-    else:
-        # All loaded — show count
-        children.append(
-            html.Div(f"All {total} reviews loaded",
-                     style={"padding": "10px", "textAlign": "center",
-                            "fontSize": "11px", "color": COLORS["gray"]})
+        return (
+            html.Div("No reviews available.",
+                     style={"padding": "20px", "color": COLORS["gray"],
+                            "textAlign": "center"}),
+            True, _BTN_DISABLED,
+            True, _BTN_DISABLED,
+            "", "Reviews",
         )
 
-    return children
+    children = [_review_list_item(r, i, selected_idx)
+                for i, r in enumerate(items)]
+
+    last_page = max(0, (total - 1) // _PAGE_SIZE) if total else 0
+    on_first = (page or 0) <= 0
+    on_last = (page or 0) >= last_page
+
+    page_display = page + 1 if page is not None else 1
+    total_pages = last_page + 1
+
+    start_num = (page or 0) * _PAGE_SIZE + 1
+    end_num = min(start_num + len(items) - 1, total or 0)
+
+    return (
+        children,
+        on_first, _BTN_DISABLED if on_first else _BTN_STYLE,
+        on_last, _BTN_DISABLED if on_last else _BTN_STYLE,
+        f"{start_num}\u2013{end_num} of {total}",
+        f"Reviews ({total})",
+    )
 
 
 # 4. Handle review selection (pattern-matching callback)
@@ -429,7 +499,6 @@ def select_review(n_clicks_list, id_list):
     if not ctx.triggered:
         return no_update
     trigger = ctx.triggered[0]["prop_id"]
-    import json
     try:
         trigger_id = json.loads(trigger.rsplit(".", 1)[0])
         return int(trigger_id["index"])
@@ -477,7 +546,7 @@ def render_detail(review_idx):
                     "fontWeight": "700", "fontSize": "14px",
                     "color": COLORS["ink"],
                 }),
-                html.Span(f"  ·  {reviewer}  ·  {date}", style={
+                html.Span(f"  \u00b7  {reviewer}  \u00b7  {date}", style={
                     "fontSize": "11px", "color": COLORS["gray"],
                     "marginLeft": "4px",
                 }),
