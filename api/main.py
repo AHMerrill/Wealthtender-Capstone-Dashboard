@@ -185,6 +185,11 @@ def eda_charts(
 # Reviews
 # ---------------------------------------------------------------------------
 
+@app.get("/api/reviews/all")
+def all_reviews():
+    return store.all_reviews_list()
+
+
 @app.get("/api/reviews/{review_id}")
 def review_detail(review_id: str):
     detail = store.review_detail(review_id)

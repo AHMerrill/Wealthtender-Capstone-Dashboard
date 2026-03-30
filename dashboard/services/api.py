@@ -80,6 +80,10 @@ def get_eda_charts(params: dict) -> dict:
     return _get("/api/eda/charts", params=params) or {}
 
 
+def get_all_reviews() -> list:
+    return _get("/api/reviews/all") or []
+
+
 def get_review_detail(review_id: str) -> dict:
     return _get(f"/api/reviews/{review_id}") or {}
 

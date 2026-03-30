@@ -531,6 +531,17 @@ class ArtifactStore:
         advisors = _sanitize_records(df[df["entity_type"] == "advisor"][out_cols])
         return {"firms": firms, "advisors": advisors}
 
+    def all_reviews_list(self) -> list:
+        """Return a lightweight list of all reviews for the browse panel."""
+        if self.review_dim_scores.empty:
+            return []
+        cols = ["review_idx", "advisor_name", "reviewer_name", "review_date"]
+        available = [c for c in cols if c in self.review_dim_scores.columns]
+        df = self.review_dim_scores[available]
+        sort_col = "review_date" if "review_date" in available else "review_idx"
+        return _sanitize_records(df.sort_values(
+            sort_col, ascending=False, na_position="last"))
+
     def dna_entity_reviews(self, entity_id: str) -> Optional[list]:
         if self.review_dim_scores.empty:
             return None
