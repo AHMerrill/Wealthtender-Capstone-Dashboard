@@ -25,8 +25,8 @@ docs/
 PROJECT_LOG.md
 
 # Large notebook data files (keep .ipynb notebooks)
-notebooks/collaborator/*.csv
-notebooks/collaborator/*.parquet
+notebooks/archive/collaborator/*.csv
+notebooks/archive/collaborator/*.parquet
 notebooks/.DS_Store
 
 # Pipeline intermediate files (large, regenerable)

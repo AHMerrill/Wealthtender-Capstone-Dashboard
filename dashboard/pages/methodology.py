@@ -307,11 +307,12 @@ SECTIONS = [
             html.H4("Dimension Query Strings", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
                 "Seven carefully crafted query strings define the quality dimensions. Each query is "
-                "a detailed paragraph (approximately 60–80 words) describing the ideal client "
-                "experience for that dimension. These queries were developed through subject matter "
-                "expertise, analysis of real client reviews, and iterative refinement with large "
-                "language models (LLMs). They capture nuanced aspects of advisor quality that go "
-                "beyond simple keyword matching."
+                "a concise two-to-three sentence description (approximately 30–45 words) of the "
+                "ideal client experience for that dimension. These queries were developed through "
+                "subject matter expertise, analysis of real client reviews, and iterative refinement "
+                "with large language models (LLMs). Shorter, tighter queries were chosen over longer "
+                "paragraphs because they produce cleaner semantic matches against the short, focused "
+                "language clients actually use in reviews."
             ),
             html.P(
                 "The seven dimensions are: Trust & Integrity, Customer Empathy & Personalization, "
