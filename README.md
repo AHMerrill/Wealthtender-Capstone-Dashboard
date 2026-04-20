@@ -134,7 +134,8 @@ assets/                       Static files served by Dash
   favicon.png
 
 data_contract/                Schema expectations for artifacts
-notebooks/collaborator/       Scoring notebook (generates scoring artifacts)
+notebooks/                    Current collaborator notebook (Embeddings+Scoring.ipynb)
+notebooks/archive/            Older / superseded notebooks kept for provenance
 
 Dockerfile.api                Container image for the API
 Dockerfile.dashboard          Container image for the dashboard
@@ -374,15 +375,24 @@ To make the pipeline concrete, here is what happens to a single real review as i
 
 ### Source Notebooks (Reference Only)
 
-The `pipeline/` package was extracted from these notebooks. They remain in the repo for provenance but are no longer needed to regenerate artifacts:
+The `pipeline/` package was extracted from these notebooks. They remain in the repo for provenance but are no longer needed to regenerate artifacts.
+
+**Current collaborator notebook** — kept alongside the pipeline code because it's the latest source of the dimension query strings:
 
 | Notebook | Location | Purpose |
 |----------|----------|---------|
-| **NLP I** | `notebooks/NLP_I.ipynb` | Cleaning, tokenization, stopword removal, n-gram analysis, embedding generation (Stages 1–2) |
-| **Scoring** | `notebooks/collaborator/query_embeddings_vs_review_embeddings.ipynb` | Dimension scoring: cosine similarity, entity-level aggregation (Stage 3) |
-| **Review Pipeline** | `notebooks/Copy of WT_Capstone_ReviewPipeline.ipynb` | Earlier version of the cleaning pipeline (Stages 1 subset) |
-| **Weighted Embeddings** | `notebooks/Wealthtender_Embeddings_WT.ipynb` | Time-weighted advisor embeddings with half-life decay (Stage 2b) |
-| **Scoring Exploration** | `notebooks/Scoring_Exploration.ipynb` | Experimental (KMeans, alternative scoring). Not part of production. |
+| **Embeddings + Scoring** | `notebooks/Embeddings+Scoring.ipynb` | Latest canonical dimension queries + scoring logic (Stage 3 reference) |
+
+**Archive** (`notebooks/archive/`) — earlier / superseded notebooks, kept for provenance:
+
+| Notebook | Location | Purpose |
+|----------|----------|---------|
+| **NLP I** | `notebooks/archive/NLP_I.ipynb` | Cleaning, tokenization, stopword removal, n-gram analysis, embedding generation (Stages 1–2) |
+| **Scoring (old)** | `notebooks/archive/collaborator/query_embeddings_vs_review_embeddings.ipynb` | Earlier dimension scoring notebook, superseded by `Embeddings+Scoring.ipynb` |
+| **Review Pipeline** | `notebooks/archive/Copy of WT_Capstone_ReviewPipeline.ipynb` | Earlier version of the cleaning pipeline (Stages 1 subset) |
+| **Weighted Embeddings** | `notebooks/archive/Wealthtender_Embeddings_WT.ipynb` | Time-weighted advisor embeddings with half-life decay (Stage 2b) |
+| **Scoring Exploration** | `notebooks/archive/Scoring_Exploration.ipynb` | Experimental (KMeans, alternative scoring). Not part of production. |
+| **Executed Output** | `notebooks/archive/collaborator/executed_output.ipynb` | Original corrected penalized-scoring reference (bug fix for Stage 3) |
 
 ### EDA Artifacts (`artifacts/macro_insights/`)
 
