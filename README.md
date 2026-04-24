@@ -166,7 +166,7 @@ Core analytical page. Three views:
 
 Confidence system: <10 reviews = amber "Directional Insights" banner; 20+ = green "Robust Data" badge + premier pool.
 
-Three scoring methods: Mean, Penalized (consistency penalty), Weighted (time-decay).
+Three scoring methods: Mean (unweighted baseline), Penalized (staleness penalty on the most-recent review), Weighted (per-review half-life decay).
 
 ### EDA (`/eda`)
 Exploratory data analysis of the review corpus: volume over time, rating distributions, word counts, n-gram analysis. Sidebar filters for entity, date range, rating, word count, review count, and stopwords.
