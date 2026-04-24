@@ -425,9 +425,9 @@ app.layout = html.Div(
                                             options=[
                                                 {"label": "Mean \u2014 equal weight across all reviews",
                                                  "value": "mean"},
-                                                {"label": "Penalized \u2014 older reviews down-weighted",
+                                                {"label": "Penalized \u2014 shrunk if advisor's last review is old",
                                                  "value": "penalized"},
-                                                {"label": "Weighted \u2014 recent reviews weighted more",
+                                                {"label": "Weighted \u2014 per-review half-life decay (2y)",
                                                  "value": "weighted"},
                                             ],
                                             value="mean",
@@ -476,11 +476,15 @@ app.layout = html.Div(
                                                         "marginBottom": "2px",
                                                     }),
                                                     html.Div(
-                                                        "Applies a staleness penalty that "
-                                                        "down-weights older reviews. Reviews "
-                                                        "lose influence as they age. Useful for "
-                                                        "surfacing whether recent feedback "
-                                                        "differs from the historical pattern.",
+                                                        "Takes the Mean embedding and scales it "
+                                                        "by a single staleness factor derived "
+                                                        "from the date of the advisor's most "
+                                                        "recent review. Advisors with a fresh "
+                                                        "review get essentially no penalty; "
+                                                        "advisors who have gone quiet for years "
+                                                        "have their entire score shrunk toward "
+                                                        "zero. A liveness check on the advisor's "
+                                                        "profile.",
                                                         style={"fontSize": "11px",
                                                                "marginBottom": "8px"},
                                                     ),
@@ -490,10 +494,14 @@ app.layout = html.Div(
                                                         "marginBottom": "2px",
                                                     }),
                                                     html.Div(
-                                                        "Time-weighted average where the most "
-                                                        "recent reviews carry the greatest "
-                                                        "influence. Best reflects current client "
-                                                        "sentiment and performance trajectory.",
+                                                        "A separate embedding pass in which "
+                                                        "every review is weighted individually "
+                                                        "by its own age, using a 2-year half-life. "
+                                                        "Every review still contributes, but a "
+                                                        "6-month-old review counts roughly twice "
+                                                        "as much as a 2-year-old one. A memory-"
+                                                        "decay model of the advisor's current "
+                                                        "reputation.",
                                                         style={"fontSize": "11px",
                                                                "marginBottom": "8px"},
                                                     ),

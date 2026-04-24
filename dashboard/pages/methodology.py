@@ -354,29 +354,38 @@ SECTIONS = [
         "content": [
             html.P(
                 "Review-level similarity scores are aggregated to the entity level (advisor or firm) "
-                "using three methods, each designed to surface different aspects of performance."
+                "using three methods, each designed to surface different aspects of performance. "
+                "All three are implemented in pipeline/embed.py and computed at scoring time in "
+                "pipeline/score.py."
             ),
             html.H4("Mean Scoring", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "The simple arithmetic mean of all review-level cosine similarity scores for an "
-                "entity within each dimension. This gives equal weight to every review regardless "
-                "of when it was written or how consistent it is with other reviews. It represents "
-                "the overall central tendency of client sentiment."
+                "The L2-normalized centroid of all review embeddings for an entity, dotted against "
+                "each dimension query. Every review counts equally, regardless of when it was written. "
+                "This is the baseline \u2014 the overall central tendency of client sentiment with no "
+                "time adjustment applied."
             ),
-            html.H4("Penalized Scoring", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.H4("Penalized Scoring (staleness penalty)", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "The mean score adjusted by a consistency penalty. Entities with high variance in "
-                "their review scores (indicating inconsistent client experiences) receive a lower "
-                "penalized score than entities with consistent scores. The penalty is proportional "
-                "to the standard deviation of review-level scores within each dimension. This method "
-                "rewards advisors whose clients consistently report similar experiences."
+                "The Mean advisor embedding scaled by a single staleness factor, then dotted against "
+                "each dimension query. The factor is derived from the age of the advisor's most recent "
+                "review only: penalty = exp(\u2212\u03bb \u00d7 staleness_years), where \u03bb is "
+                "calibrated so an advisor at the 75th-percentile staleness receives a 0.7\u00d7 "
+                "penalty. Advisors whose newest review is recent get essentially no penalty; advisors "
+                "who have gone quiet for years have their scores shrunk toward zero. Think of it as a "
+                "liveness check \u2014 the most recent review is the advisor's signal-of-life, and a "
+                "stale signal pulls the profile down."
             ),
-            html.H4("Weighted Scoring", style={"marginTop": "16px", "color": COLORS["navy"]}),
+            html.H4("Weighted Scoring (per-review time decay)", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
-                "A time-weighted mean that gives more recent reviews higher influence. Older reviews "
-                "contribute less to the aggregate score, reflecting the idea that recent client "
-                "experiences are more indicative of current advisor quality. The weighting function "
-                "applies exponential decay based on review age."
+                "A separate embedding pass in which every review is weighted individually by its own "
+                "age using a 2-year half-life: w = 0.5^(age_years / 2.0). The advisor embedding is "
+                "the weighted mean of its review embeddings, then dotted against each dimension query. "
+                "Unlike Penalized, which scales the whole advisor by one number keyed off the newest "
+                "review only, Weighted lets every review contribute in proportion to its own age \u2014 "
+                "so a 6-month-old review counts roughly twice as much as a 2-year-old one, which in "
+                "turn counts roughly twice as much as a 4-year-old one. It is a memory-decay model of "
+                "the advisor's current reputation."
             ),
             html.H4("Entity Types", style={"marginTop": "16px", "color": COLORS["navy"]}),
             html.P(
